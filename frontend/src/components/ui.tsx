@@ -9,8 +9,9 @@
  * noch eingehaengt — die IDs stehen hier bereits.
  */
 
-import type { ReactNode } from "react";
-import { useState } from "react";
+import type { ReactElement, ReactNode } from "react";
+import { cloneElement, isValidElement, useId, useState } from "react";
+import { HelpTip } from "./HelpTip";
 import type { Quantity, Reliability } from "../types";
 
 /* ----------------------------------------------------------------- Karte */
@@ -36,7 +37,12 @@ export function Card({
           style={{ borderBottom: "1px solid var(--border)" }}
         >
           <div>
-            {title && <h2 className="text-sm font-semibold">{title}</h2>}
+            {title && (
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                {title}
+                {helpId && <HelpTip id={helpId} />}
+              </h2>
+            )}
             {subtitle && (
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                 {subtitle}
@@ -155,8 +161,12 @@ export function ResultNumber({
       {/* Der Kopierknopf sitzt in der Beschriftungszeile. Neben der Zahl
           wuerde er in schmalen Spalten darueberlaufen. */}
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 text-xs" style={{ color: "var(--text-muted)" }}>
+        <span
+          className="flex min-w-0 items-center gap-1.5 text-xs"
+          style={{ color: "var(--text-muted)" }}
+        >
           {label}
+          {helpId && <HelpTip id={helpId} />}
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
           <ReliabilityMark
@@ -236,23 +246,44 @@ export function Field({
   helpId,
   role = "input",
   hint,
+  htmlFor,
   children,
 }: {
   label: string;
   helpId?: string;
   role?: "input" | "settings";
   hint?: string;
+  /** Nur noetig, wenn mehrere Bedienelemente im Feld stehen. */
+  htmlFor?: string;
   children: ReactNode;
 }) {
+  // Kein `<label>` um das Ganze: ein Knopf (das Fragezeichen) in einem Label
+  // loeste beim Klick das zugehoerige Feld mit aus. Die Beziehung zwischen
+  // Beschriftung und Feld stellt darum `htmlFor` auf `id` her — ohne sie
+  // haette das Feld keinen vorlesbaren Namen.
+  const generatedId = useId();
+  const controlId = htmlFor ?? generatedId;
+
+  // Das einzelne Bedienelement bekommt die ID untergeschoben. Hat es schon
+  // eine oder sind es mehrere, setzt der Aufrufer `htmlFor` selbst.
+  const control =
+    htmlFor === undefined && isValidElement(children)
+      ? cloneElement(children as ReactElement<{ id?: string }>, {
+          id: (children.props as { id?: string }).id ?? controlId,
+        })
+      : children;
+
   return (
-    <label className="block" data-help={helpId}>
-      <span
+    <div className="block" data-help={helpId}>
+      <label
+        htmlFor={controlId}
         className="mb-1 flex items-center gap-1.5 text-xs font-medium"
         style={{ color: "var(--text-muted)" }}
       >
         {label}
         <span
           aria-hidden="true"
+          title={role === "input" ? "Eingabe" : "Einstellung"}
           style={{
             width: 6,
             height: 6,
@@ -261,8 +292,9 @@ export function Field({
               role === "input" ? "var(--role-input)" : "var(--role-settings)",
           }}
         />
-      </span>
-      {children}
+        {helpId && <HelpTip id={helpId} />}
+      </label>
+      {control}
       {hint && (
         <span
           className="mt-1 block text-xs"
@@ -271,7 +303,7 @@ export function Field({
           {hint}
         </span>
       )}
-    </label>
+    </div>
   );
 }
 
@@ -282,6 +314,7 @@ export function NumberInput({
   min,
   role = "settings",
   helpId,
+  id,
 }: {
   value: number | "";
   onChange: (value: number | "") => void;
@@ -289,9 +322,12 @@ export function NumberInput({
   min?: number;
   role?: "input" | "settings";
   helpId?: string;
+  /** Wird von `Field` gesetzt, damit die Beschriftung darauf zeigen kann. */
+  id?: string;
 }) {
   return (
     <input
+      id={id}
       type="number"
       className="ol-input ol-mono tabular-nums"
       data-role={role}

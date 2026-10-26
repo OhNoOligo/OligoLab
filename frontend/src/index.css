@@ -258,3 +258,147 @@ table.ol-table tfoot td {
   border-bottom: none;
   font-weight: 600;
 }
+
+/* --- Fragezeichen-Hilfe -------------------------------------------------- */
+/* Klein und grau: sie soll da sein, wenn man sie sucht, und sonst nicht
+   auffallen. Die Trefferfläche ist groesser als das Zeichen, damit sie
+   auch mit dem Finger zu treffen ist. */
+
+.ol-helptip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  cursor: help;
+  /* Vergroessert die Trefferflaeche auf 28 px, ohne das Layout zu stoeren. */
+  position: relative;
+}
+
+.ol-helptip::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.ol-helptip:hover,
+.ol-helptip[aria-expanded="true"] {
+  border-color: var(--role-result);
+  color: var(--role-result);
+}
+
+.ol-helptip:focus-visible {
+  outline: 2px solid var(--role-result);
+  outline-offset: 2px;
+}
+
+.ol-helptip-bubble,
+.ol-helptip-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  letter-spacing: normal;
+}
+
+.ol-helptip-bubble[data-visible="false"] {
+  /* Nicht `display: none`: der Text muss im Baum bleiben, damit
+     `aria-describedby` darauf zeigen kann. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
+.ol-helptip-panel {
+  max-width: 340px;
+  border-color: var(--role-result);
+}
+
+/* Am rechten Rand nach links ausrichten, damit das Panel im Bild bleibt. */
+.ol-helptip-right .ol-helptip-bubble,
+.ol-helptip-right .ol-helptip-panel {
+  left: auto;
+  right: 0;
+}
+
+/* --- Kopfzeile ----------------------------------------------------------- */
+
+.ol-header-slot {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--radius-card);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+button.ol-header-slot {
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.ol-header-slot:hover {
+  border-color: var(--border);
+  background: var(--surface-sunken);
+}
+
+button.ol-header-slot:focus-visible {
+  outline: 2px solid var(--role-result);
+  outline-offset: 1px;
+}
+
+/* --- Statuspunkt in der Seitenleiste ------------------------------------- */
+/* Bewusst nicht die Ampel: `veraltet` ist keine Bewertung, sondern eine
+   Tatsache ueber den Rechenstand. */
+
+.ol-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.ol-status-empty {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+}
+
+.ol-status-computed {
+  background: var(--role-result);
+}
+
+.ol-status-stale {
+  background: var(--rating-warn);
+}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../api";
 import type { ConsumptionTable } from "../../types";
+import { HelpTip } from "../HelpTip";
 import { Card, Empty, Field, Notice, NumberInput, formatNumber } from "../ui";
 
 export function SynthesisTab({
@@ -108,7 +109,10 @@ export function SynthesisTab({
                 <th scope="col">Volumen (mL)</th>
                 <th scope="col">c (mol/L)</th>
                 <th scope="col" data-help="result.consumption_mass">
-                  Masse (mg)
+                  <span className="inline-flex items-center gap-1.5">
+                    Masse (mg)
+                    <HelpTip id="result.consumption_mass" />
+                  </span>
                 </th>
                 <th scope="col">
                   + {formatNumber(table.settings.reserve_fraction * 100, 0)} %
@@ -145,7 +149,12 @@ export function SynthesisTab({
             </tbody>
             <tfoot>
               <tr data-help="result.consumption_total">
-                <td>Summe</td>
+                <td>
+                  <span className="inline-flex items-center gap-1.5">
+                    Summe
+                    <HelpTip id="result.consumption_total" />
+                  </span>
+                </td>
                 <td className="ol-mono tabular-nums">
                   {table.rows.reduce((sum, row) => sum + row.couplings, 0)}
                 </td>

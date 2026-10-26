@@ -122,6 +122,38 @@ entries:
       OligoLab über das natürliche Analogon und kennzeichnet das Ergebnis
       als genähert.
 
+  field.buffer:
+    title: "Bedingungen"
+    short: >
+      Oligo-Konzentration, Kationen und Reaktionstemperatur. Sie gelten für
+      das ganze Programm und gehen ab Phase 5 in Tm und ΔG ein.
+    long: >
+      Tm hängt stark an der Ionenstärke: mehr Natrium stabilisiert die
+      Doppelhelix, Magnesium noch deutlich mehr. Die Reaktionstemperatur ist
+      die, bei der das DNAzym arbeiten soll — meist 37 °C. Liegt der Tm der
+      Arme weit darüber, bindet das DNAzym sein Produkt zu fest für
+      Mehrfachumsatz.
+  field.oligo_conc:
+    title: "Oligo-Konzentration"
+    short: >
+      Konzentration des DNAzyms im Ansatz. Geht in die Tm-Rechnung ein: eine
+      bimolekulare Hybridisierung schmilzt konzentrationsabhängig.
+  field.reaction_temp:
+    title: "Reaktionstemperatur"
+    short: >
+      Bei welcher Temperatur das DNAzym arbeiten soll, meist 37 °C. Wird ab
+      Phase 5 gegen den Tm der Arme gehalten.
+  field.target:
+    title: "Ziel-RNA"
+    short: >
+      Die Sequenz, die geschnitten werden soll, 5′ nach 3′. DNA wird
+      stillschweigend in RNA übersetzt (T → U).
+  field.region:
+    title: "Gewählter Bereich"
+    short: >
+      Ausschnitt der Ziel-RNA, auf den gerechnet wird. Bei Transkripten von
+      mehreren Kilobasen spart das viel Zeit.
+
   # ----------------------------------------------------------- Ergebnisse
   result.fully_deprotected:
     title: "vollständig entschützt"
@@ -223,6 +255,29 @@ entries:
       zu verdünnt für diese Beladung.
 
   # ----------------------------------------------------------- Verfahren
+  method.stale:
+    title: "Veraltet"
+    short: >
+      Die Eingaben haben sich geändert, seit dieser Bereich zuletzt gerechnet
+      hat. Die alten Zahlen gelten nicht mehr und werden darum nicht als
+      gültig gezeigt.
+    long: >
+      Jeder Bereich merkt sich, womit er gerechnet hat: der Steckbrief und der
+      Strang hängen am DNAzym, Ziel und Entwurf an der Zielsequenz und am
+      gewählten Bereich, der Entwurf zusätzlich an den Bedingungen. Ändert
+      sich eines dieser Stücke, wird der Bereich als veraltet markiert und
+      bietet „Neu berechnen" an. Ein Dreh am Magnesium entwertet deshalb den
+      Entwurf, aber nicht den Steckbrief — dort spielt es keine Rolle.
+  method.handoff:
+    title: "Übergabe"
+    short: >
+      Jeder Bereich endet mit einem Knopf, der sein Ergebnis in den nächsten
+      trägt. Der nächste Bereich öffnet sich bereits gefüllt.
+    long: >
+      Der Weg ist Ziel → Entwurf → Strang → Steckbrief → 3D. Sequenzen werden
+      dabei nicht kopiert: alle Bereiche lesen aus demselben Zustand. Was in
+      der Kopfzeile steht, ist überall dasselbe.
+
   method.reliability:
     title: "Verlässlichkeit"
     short: >

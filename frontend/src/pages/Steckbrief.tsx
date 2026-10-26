@@ -21,6 +21,8 @@ import { LoadingTab } from "../components/tabs/LoadingTab";
 import { MsTab } from "../components/tabs/MsTab";
 import { SynthesisTab } from "../components/tabs/SynthesisTab";
 import { Card, Chip, Field, Notice } from "../components/ui";
+import { Handoff } from "../components/AreaShell";
+import { useStore } from "../state/store";
 import type { MonomerKlasse, Profile } from "../types";
 
 /* Die Regressionssequenz aus CLAUDE.md — ein 10-23-DNAzym. */
@@ -35,10 +37,19 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function Steckbrief() {
-  const [sequence, setSequence] = useState(EXAMPLE);
-  const [name, setName] = useState("DZ 10-23 Referenz");
-  const [notes, setNotes] = useState("");
+export function Steckbrief({ navigate }: { navigate: (path: string) => void }) {
+  // Die Sequenz liegt im globalen Zustand, nicht hier. Haette diese Seite
+  // ihre eigene Kopie, liefe sie gegen die Kopfzeile und gegen jeden anderen
+  // Bereich — genau das verbietet PHASEN.md 2.1.
+  const { state, setOligo, patchOligo, markComputed } = useStore();
+  const sequence = state.activeOligo?.sequence ?? "";
+  const name = state.activeOligo?.name ?? "";
+  const notes = state.activeOligo?.notes ?? "";
+
+  const setSequence = (value: string) => patchOligo({ sequence: value });
+  const setName = (value: string) => patchOligo({ name: value });
+  const setNotes = (value: string) => patchOligo({ notes: value });
+
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,6 +59,11 @@ export function Steckbrief() {
   /* Die Rechnung laeuft entkoppelt vom Tippen. 250 ms reichen, damit die
    * Oberflaeche nie einruckelt (CLAUDE.md, Regel 8). */
   useEffect(() => {
+    if (!sequence.trim()) {
+      setProfile(null);
+      setError(null);
+      return;
+    }
     const timer = window.setTimeout(() => {
       setBusy(true);
       api
@@ -55,6 +71,12 @@ export function Steckbrief() {
         .then((result) => {
           setProfile(result);
           setError(null);
+          // Nur eine durchgerechnete Sequenz gilt als berechnet. Mit
+          // Befunden bleibt der Bereich leer, statt einen Stand zu
+          // behaupten, den es nicht gibt.
+          if (result.problems.length === 0 && result.oligo.length > 0) {
+            markComputed("steckbrief");
+          }
         })
         .catch((cause: unknown) =>
           setError(
@@ -66,6 +88,9 @@ export function Steckbrief() {
         .finally(() => setBusy(false));
     }, 250);
     return () => window.clearTimeout(timer);
+    // `markComputed` ist bewusst nicht in der Liste: es aendert sich mit
+    // jedem Zustandswechsel und wuerde die Rechnung endlos neu anstossen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sequence, name, notes]);
 
   const oligo = profile?.oligo ?? null;
@@ -103,6 +128,7 @@ export function Steckbrief() {
         <Card
           title="Sequenz"
           subtitle="Synthi-Sprache, 5′ nach 3′"
+          helpId="field.sequence"
           actions={
             <>
               <button
@@ -138,6 +164,27 @@ export function Steckbrief() {
             oligo={oligo}
             problems={problems}
           />
+
+          {!sequence.trim() && (
+            <p className="mt-2 text-xs" style={{ color: "var(--text-faint)" }}>
+              Noch nichts eingegeben.{" "}
+              <button
+                type="button"
+                className="underline"
+                style={{ color: "var(--role-result)" }}
+                onClick={() =>
+                  setOligo({
+                    name: "DZ 10-23 Referenz",
+                    sequence: EXAMPLE,
+                    notes: "Beispiel aus CLAUDE.md",
+                  })
+                }
+              >
+                Beispielsequenz laden
+              </button>{" "}
+              — das 10-23-DNAzym aus den Projektregeln.
+            </p>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Chip role="result" title="Zahl der Bausteine; Konjugate zählen nicht mit">
@@ -330,15 +377,28 @@ export function Steckbrief() {
         </div>
       </div>
 
+      <Handoff
+        label="3D-Modell bauen"
+        disabled={!profile || problems.length > 0}
+        reason={
+          problems.length > 0
+            ? "Erst die unklaren Stellen klären"
+            : "Erst eine Sequenz eingeben"
+        }
+        onClick={() => navigate("/3d")}
+      />
+
       <LibraryPanel
         sequence={sequence}
         name={name}
         notes={notes}
-        onLoad={(entry) => {
-          setSequence(entry.sequence);
-          setName(entry.name);
-          setNotes(entry.notes ?? "");
-        }}
+        onLoad={(entry) =>
+          setOligo({
+            name: entry.name,
+            sequence: entry.sequence,
+            notes: entry.notes ?? "",
+          })
+        }
       />
     </div>
   );

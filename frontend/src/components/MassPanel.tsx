@@ -7,6 +7,7 @@
  */
 
 import { useState } from "react";
+import { HelpTip } from "./HelpTip";
 import type { Comparison, ExactResult, MassResult } from "../types";
 import {
   Card,
@@ -56,6 +57,9 @@ export function MassCard({ mass }: { mass: MassResult | null }) {
                 <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                   {entry.label}
                 </span>
+                {HELP_BY_KEY[entry.key] && (
+                  <HelpTip id={HELP_BY_KEY[entry.key]!} />
+                )}
                 <ReliabilityMark
                   reliability={entry.reliability}
                   note={entry.note}
@@ -214,6 +218,9 @@ export function ExactCard({
 
       <div className="mt-4" data-help="result.difference">
         <Notice level={comparison.agrees ? "info" : "warn"}>
+          <span className="float-right ml-2">
+            <HelpTip id="result.difference" />
+          </span>
           {comparison.message}
         </Notice>
       </div>

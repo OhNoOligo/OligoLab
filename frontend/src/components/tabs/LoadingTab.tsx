@@ -181,9 +181,14 @@ export function LoadingTab() {
           <Field label="V(Stock) (µL)" helpId="field.v_stock">
             <NumberInput value={vStock} onChange={setVStock} step={1} min={0.1} role="input" />
           </Field>
-          <Field label="Als Probe merken" hint="Name vergeben und speichern">
+          <Field
+            label="Als Probe merken"
+            hint="Name vergeben und speichern"
+            htmlFor="probenname"
+          >
             <div className="flex gap-2">
               <input
+                id="probenname"
                 className="ol-input"
                 data-role="input"
                 value={sampleName}

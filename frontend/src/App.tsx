@@ -1,26 +1,64 @@
-/* Rahmen und Navigation.
+/* Rahmen, Navigation und Routing (PHASEN.md 2.2 bis 2.4).
  *
- * Phase 1 bringt zwei Seiten: "Steckbrief" und "Bausteine". Die Seitenleiste
- * mit den fuenf Bereichen Ziel, Entwurf, Strang, Steckbrief und 3D samt
- * Statusanzeige und Tastaturkuerzeln gehoert zu Phase 2 — hier steht nur, was
- * schon rechnet.
+ * Aufbau: die Kopfzeile ist immer sichtbar, links die Seitenleiste mit den
+ * fünf Bereichen, rechts der Inhalt. Die Bereiche Ziel, Entwurf, Strang und
+ * 3D sind angelegt und erreichbar; ihren Inhalt füllen die Phasen 3 bis 6.
  */
 
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import { Bausteine } from "./pages/Bausteine";
-import { Steckbrief } from "./pages/Steckbrief";
+import { Header } from "./components/Header";
+import { HelpProvider } from "./components/HelpTip";
+import { AREAS, Sidebar } from "./components/Sidebar";
 import { Notice } from "./components/ui";
+import { Bausteine } from "./pages/Bausteine";
+import { Entwurf, Modell3D, Strang, Ziel } from "./pages/Bereiche";
+import { Hilfe } from "./pages/Hilfe";
+import { Steckbrief } from "./pages/Steckbrief";
+import { useRoute } from "./router";
+import { StoreProvider } from "./state/store";
 
-const PAGES = [
-  { id: "steckbrief", label: "Steckbrief", hint: "Sequenz, Massen, Verbrauch" },
-  { id: "bausteine", label: "Bausteine", hint: "Monomere und Konstanten" },
-] as const;
+function Inhalt({
+  path,
+  navigate,
+}: {
+  path: string;
+  navigate: (path: string) => void;
+}) {
+  switch (path) {
+    case "/":
+    case "/steckbrief":
+      return <Steckbrief navigate={navigate} />;
+    case "/ziel":
+      return <Ziel navigate={navigate} />;
+    case "/entwurf":
+      return <Entwurf navigate={navigate} />;
+    case "/strang":
+      return <Strang navigate={navigate} />;
+    case "/3d":
+      return <Modell3D />;
+    case "/bausteine":
+      return <Bausteine />;
+    case "/hilfe":
+      return <Hilfe />;
+    default:
+      return (
+        <Notice level="warn" title="Diese Seite gibt es nicht">
+          <button
+            type="button"
+            className="underline"
+            style={{ color: "var(--role-result)" }}
+            onClick={() => navigate("/")}
+          >
+            Zurück zum Steckbrief
+          </button>
+        </Notice>
+      );
+  }
+}
 
-type PageId = (typeof PAGES)[number]["id"];
-
-export default function App() {
-  const [page, setPage] = useState<PageId>("steckbrief");
+function Rahmen() {
+  const [path, navigate] = useRoute();
   const [version, setVersion] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
 
@@ -34,61 +72,52 @@ export default function App() {
       .catch(() => setOffline(true));
   }, []);
 
+  // Der Titel des Fensters folgt dem Bereich — hilft bei mehreren Tabs.
+  useEffect(() => {
+    const area = AREAS.find((entry) => entry.path === path);
+    document.title = area ? `${area.label} · OligoLab` : "OligoLab";
+  }, [path]);
+
   return (
-    <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-4 p-4 sm:flex-row">
-      <nav
-        className="ol-card shrink-0 self-start p-2 sm:sticky sm:top-4 sm:w-52"
-        aria-label="Bereiche"
-      >
-        <div className="px-2 pb-3 pt-1">
-          <p className="text-sm font-semibold">OligoLab</p>
-          <p className="text-xs" style={{ color: "var(--text-faint)" }}>
-            {version ? `Version ${version}` : "nicht verbunden"}
+    <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-4 p-4">
+      <Header />
+
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <div className="shrink-0 sm:w-56">
+          <Sidebar path={path} navigate={navigate} />
+          <p
+            className="mt-2 px-2 text-[11px]"
+            style={{ color: "var(--text-faint)" }}
+          >
+            OligoLab {version ? `${version}` : ""}
+            <br />
+            Alles läuft lokal.
           </p>
         </div>
-        <ul className="flex gap-1 sm:flex-col">
-          {PAGES.map((entry) => {
-            const active = entry.id === page;
-            return (
-              <li key={entry.id}>
-                <button
-                  type="button"
-                  className="w-full rounded-lg px-2 py-1.5 text-left"
-                  aria-current={active ? "page" : undefined}
-                  onClick={() => setPage(entry.id)}
-                  style={{
-                    background: active
-                      ? "color-mix(in srgb, var(--role-result) 12%, transparent)"
-                      : "transparent",
-                    border: `1px solid ${active ? "var(--role-result)" : "transparent"}`,
-                    color: active ? "var(--role-result)" : "var(--text)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span className="block text-sm font-medium">{entry.label}</span>
-                  <span className="block text-xs" style={{ color: "var(--text-faint)" }}>
-                    {entry.hint}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
 
-      <main className="min-w-0 flex-1">
-        {offline && (
-          <div className="mb-4">
-            <Notice level="bad" title="Backend nicht erreichbar">
-              OligoLab rechnet lokal. Starte das Backend mit{" "}
-              <code className="ol-mono">uvicorn app.main:app --reload</code> und
-              lade die Seite neu.
-            </Notice>
-          </div>
-        )}
-        {page === "steckbrief" && <Steckbrief />}
-        {page === "bausteine" && <Bausteine />}
-      </main>
+        <main className="min-w-0 flex-1">
+          {offline && (
+            <div className="mb-4">
+              <Notice level="bad" title="Backend nicht erreichbar">
+                OligoLab rechnet lokal. Starte das Backend mit{" "}
+                <code className="ol-mono">uvicorn app.main:app --reload</code> und
+                lade die Seite neu.
+              </Notice>
+            </div>
+          )}
+          <Inhalt path={path} navigate={navigate} />
+        </main>
+      </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <StoreProvider>
+      <HelpProvider>
+        <Rahmen />
+      </HelpProvider>
+    </StoreProvider>
   );
 }

@@ -19,8 +19,7 @@ from typing import Any, Literal
 import yaml
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app import (
@@ -263,6 +262,29 @@ def parse_sequence(request: SequenceRequest) -> dict[str, Any]:
         "oligo": _oligo_payload(oligo),
         "problems": [p.as_dict() for p in problems],
         "grouped": notation.to_string(oligo, group=3),
+    }
+
+
+@app.post("/api/summary")
+def summary(request: SequenceRequest) -> dict[str, Any]:
+    """Das Noetigste fuer die Kopfzeile: Laenge, Masse, Zahl der Befunde.
+
+    Eigener Endpunkt, damit die immer sichtbare Kopfzeile nicht bei jedem
+    Tastendruck die volle Rechnung samt Isotopenmuster anstossen muss. Und
+    damit die Masse dort aus derselben Quelle kommt wie im Steckbrief — eine
+    im Zustand mitgefuehrte Kopie liefe irgendwann auseinander.
+    """
+    registry = get_registry()
+    oligo, problems = notation.analyse(request.sequence, registry, request.name)
+    mass_value = None
+    if not problems and oligo.length:
+        mass_value = mass.compute(oligo, registry).fully_deprotected.value
+    return {
+        "length": oligo.length,
+        "mass_fully_deprotected": mass_value,
+        "problems": len(problems),
+        "phosphorothioates": oligo.phosphorothioate_count(),
+        "conjugates": len(oligo.conjugates),
     }
 
 
@@ -678,4 +700,26 @@ def help_entries() -> dict[str, Any]:
 
 _DIST = PROJECT_ROOT / "frontend" / "dist"
 if _DIST.is_dir():
-    app.mount("/", StaticFiles(directory=_DIST, html=True), name="frontend")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa(full_path: str) -> FileResponse:
+        """Alles ausserhalb von `/api` liefert die Oberflaeche aus.
+
+        Die Adressen der Oberflaeche (`/hilfe`, `/strang`, ...) sind echte
+        Pfade. Ohne diesen Rueckfall liefe ein Direktaufruf oder ein
+        Neuladen auf `/hilfe` in einen 404.
+        """
+        # Ein unbekannter Endpunkt bleibt ein 404. Ihm die Oberflaeche
+        # zurueckzugeben wuerde jeden Tippfehler in einer Adresse als
+        # scheinbaren Erfolg tarnen.
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Unbekannter Endpunkt.")
+
+        candidate = (_DIST / full_path).resolve()
+        if (
+            full_path
+            and _DIST.resolve() in candidate.parents
+            and candidate.is_file()
+        ):
+            return FileResponse(candidate)
+        return FileResponse(_DIST / "index.html")

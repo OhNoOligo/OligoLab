@@ -359,3 +359,8 @@ def test_bibliothek_nennt_die_gesamtzahl(client):
         )
     assert client.get("/api/library/oligos").json()["total"] == 3
     assert client.get("/api/library/oligos", params={"q": "Oligo 1"}).json()["total"] == 1
+
+
+def test_unbekannter_endpunkt_bleibt_404(client):
+    """Der SPA-Rückfall darf keinen Tippfehler in einer Adresse verdecken."""
+    assert client.get("/api/gibtesnicht").status_code == 404

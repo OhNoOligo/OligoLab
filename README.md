@@ -4,7 +4,8 @@ Lokales Programm zum Rechnen und Visualisieren für modifizierte DNAzyme
 (10-23). Die Projektregeln stehen in [`CLAUDE.md`](CLAUDE.md), die
 Arbeitsschritte in [`PHASEN.md`](PHASEN.md).
 
-**Stand: Phase 1 abgeschlossen** — Massenrechner und Steckbrief.
+**Stand: Phase 2 abgeschlossen** — Massenrechner, Steckbrief, Oberfläche
+und Navigation.
 
 ---
 
@@ -27,9 +28,14 @@ dann genügt Uvicorn allein.
 Tests:
 
 ```bash
-.venv/bin/python -m pytest          # 171 Fälle
+.venv/bin/python -m pytest          # 172 Fälle
 cd frontend && npm run typecheck
+cd frontend && npm run e2e          # Abnahmetest zu Phase 2
 ```
+
+Der Abnahmetest fährt die gebaute Oberfläche gegen das laufende Backend. Er
+braucht einmalig einen Browser (`npx playwright install chromium`); liegt
+schon einer auf dem Rechner, genügt sein Pfad in `CHROMIUM_PATH`.
 
 `.env` enthält nur Pfade zu externen Programmen (MELTING ab Phase 5, ORCA ab
 Phase 6) und keine Zugangsdaten — OligoLab braucht keine. Maschinenspezifische
@@ -49,13 +55,49 @@ Abweichungen gehören in `.env.local`, das nicht versioniert wird.
 | ε₂₆₀ und OD-Umrechnung | `app/extinction.py` | Nearest-Neighbor |
 | Bibliothek und Probenliste | `app/library.py` | SQLite, CSV-Export |
 
-Die Oberfläche hat zwei Seiten: **Steckbrief** (Sequenz, Massen, Reiter für
-Synthese, Beladung, MS und Konzentration, Bibliothek) und **Bausteine** (alle
-Konstanten ansehen, ändern, eigene anlegen).
+Die Oberfläche hat zwei gefüllte Seiten: **Steckbrief** (Sequenz, Massen,
+Reiter für Synthese, Beladung, MS und Konzentration, Bibliothek) und
+**Bausteine** (alle Konstanten ansehen, ändern, eigene anlegen).
 
 Die Sollwerte aus `CLAUDE.md` stehen als pytest-Fälle im Projekt und stimmen:
 alle fünf Massen auf 0,01 Da, die Verbrauchstabelle einschließlich Summe und
 Reserve.
+
+---
+
+## Was Phase 2 kann
+
+**Ein Zustand für alles.** `activeOligo`, `activeTarget` und die Bedingungen
+liegen in `frontend/src/state/store.tsx` und nirgends sonst. Keine Seite hält
+eine eigene Kopie der Sequenz — sonst liefe sie irgendwann auseinander, ohne
+dass es jemandem auffiele. Gespiegelt in `localStorage`, ein Neuladen verliert
+nichts.
+
+**Veraltete Ergebnisse sagen es.** Jeder Bereich merkt sich einen
+Fingerabdruck der Eingaben, mit denen er gerechnet hat. Ändert sich etwas
+daran, steht in der Seitenleiste `veraltet` und der Bereich bietet
+„Neu berechnen" an, statt alte Zahlen als gültig auszugeben. Welche Eingaben
+zählen, ist je Bereich festgelegt: ein Dreh am Magnesium entwertet den
+Entwurf, aber nicht den Steckbrief.
+
+**Kopfzeile, immer sichtbar.** Links das aktive DNAzym mit Name, Länge und
+Masse und einem Schnellwechsler auf die zuletzt benutzten; in der Mitte die
+Ziel-RNA; rechts die Bedingungen. Ist ein Platz leer, steht dort ein
+Eingabefeld statt einer leeren Zeile. Die Masse holt die Kopfzeile über
+`/api/summary` aus derselben Quelle wie der Steckbrief.
+
+**Fünf Bereiche, eine Reihenfolge.** Ziel · Entwurf · Strang · Steckbrief · 3D
+als Seitenleiste links, jeder mit seinem Stand und mit Strg+1 bis Strg+5
+erreichbar. Vier davon sind angelegt und erreichbar, rechnen aber noch nicht —
+sie sagen, was sie brauchen, und die Phasen 3 bis 6 füllen sie.
+
+**Übergaben.** Jeder Bereich endet mit einem Knopf in den nächsten.
+
+**Fragezeichen-Hilfe.** `<HelpTip />` zieht aus `help/help.yaml`; Überfahren
+zeigt zwei bis drei Sätze, Klick ein Panel mit Details, Escape schließt.
+`aria-describedby` ist gesetzt, Tastatur und Finger gehen. Die Glossarseite
+`/hilfe` listet alle 49 Einträge mit Suchfeld. Weil die `data-help`-IDs schon
+in Phase 1 an jedem Feld standen, musste die Komponente nur eingehängt werden.
 
 ---
 
@@ -142,14 +184,19 @@ kann hell und dunkel. Die echten Diagramme der späteren Phasen
 (Bogendiagramm, Zugänglichkeitsprofil) bekommen eine Bibliothek, sobald sie
 gebraucht wird.
 
-**Nur `data-help`-Attribute, noch keine Fragezeichen-Hilfe.** Die Komponente
-`<HelpTip />` und die Seite `/hilfe` gehören zu Phase 2. `help/help.yaml` ist
-mit 42 Einträgen angelegt, und jedes Formularfeld und jede Ergebnisgröße trägt
-die passende ID — Phase 2 hängt die Komponente nur noch ein.
+**Nur `data-help`-Attribute, noch keine Fragezeichen-Hilfe** — erledigt in
+Phase 2.
 
-**Die Navigation hat zwei Einträge.** Die Seitenleiste mit Ziel, Entwurf,
-Strang, Steckbrief und 3D samt Statusanzeige und Tastaturkürzeln ist
-Phase 2. Hier steht nur, was schon rechnet.
+**Ein eigener kleiner Router statt react-router.** Sechs feste Pfade
+rechtfertigen keine Bibliothek; `frontend/src/router.tsx` sind vierzig Zeilen
+über `history.pushState`. Damit ein Direktaufruf von `/hilfe` nicht ins Leere
+läuft, liefert das Backend für alles außerhalb von `/api` die `index.html`
+aus — ein unbekannter Endpunkt unter `/api` bleibt ein 404.
+
+**Ein zusätzlicher Endpunkt `/api/summary`.** Nur Länge, Masse und Zahl der
+Befunde, für die immer sichtbare Kopfzeile. Sie soll nicht bei jedem
+Tastendruck die volle Rechnung samt Isotopenmuster anstoßen, und die Masse
+dort soll aus derselben Quelle kommen wie im Steckbrief.
 
 ---
 
@@ -173,4 +220,6 @@ Phase 2. Hier steht nur, was schon rechnet.
 
 ## Nächster Schritt
 
-Phase 2 — Oberfläche und Navigation (`PHASEN.md`, Abschnitt 2).
+Phase 3 — Den Strang sichtbar machen (`PHASEN.md`, Abschnitt 3): Bauteile
+erkennen, Faltung mit ViennaRNA, kritische Stellen und die Sequenzkarte als
+SVG.

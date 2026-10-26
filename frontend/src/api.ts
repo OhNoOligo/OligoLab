@@ -70,6 +70,15 @@ const post = <T,>(path: string, body: unknown) =>
 export const api = {
   health: () => request<{ status: string; version: string }>("/api/health"),
 
+  summary: (sequence: string) =>
+    post<{
+      length: number;
+      mass_fully_deprotected: number | null;
+      problems: number;
+      phosphorothioates: number;
+      conjugates: number;
+    }>("/api/summary", { sequence }),
+
   profile: (sequence: string, name?: string, notes?: string) =>
     post<Profile>("/api/profile", { sequence, name, notes }),
 
