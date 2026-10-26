@@ -97,6 +97,55 @@ def _letters(oligo: Oligo, registry: Registry) -> tuple[list[str | None], list[s
     return letters, approximated, missing, own_eps
 
 
+# --------------------------------------------------- Nachschlagen mit Rückgriff
+#
+# Ein DNAzym ist fast nie sortenrein: Arme aus DNA, Substrat oder modifizierte
+# Positionen aus RNA. Dann enthaelt dieselbe Sequenz T und U, und kein einzelnes
+# Tabellenwerk deckt alle Nachbarpaare ab — die DNA-Tabelle kennt kein U, die
+# RNA-Tabelle kein T, und `TU` steht in keiner von beiden.
+#
+# Darum wird in drei Stufen gesucht. Jeder Rueckgriff ueber die erste Stufe
+# hinaus macht das Ergebnis zu einer Naeherung und wird benannt
+# (CLAUDE.md, Regel 3).
+
+
+def _swap_uracil(key: str, table_name: str) -> str:
+    """U gegen T tauschen, je nachdem welche Tabelle gefragt ist."""
+    return key.replace("U", "T") if table_name == "dna" else key.replace("T", "U")
+
+
+def _lookup(
+    key: str,
+    kind: str,
+    primary: dict,
+    other: dict,
+    primary_name: str,
+    other_name: str,
+) -> tuple[float | None, str | None]:
+    """Wert und, falls zurückgegriffen wurde, die Begründung dafür."""
+    direct = primary.get(kind, {}).get(key)
+    if direct is not None:
+        return direct, None
+
+    # Stufe 2: die andere Tabelle. Deckt die gemischten Paare ab.
+    borrowed = other.get(kind, {}).get(key)
+    if borrowed is not None:
+        return borrowed, f"{key} aus der Tabelle {other_name.upper()}"
+
+    # Stufe 3: U und T gelten als einander ähnlich genug. Greift bei `TU`
+    # und `UT`, die es in keiner der beiden Tabellen gibt.
+    swapped = _swap_uracil(key, primary_name)
+    if swapped != key:
+        fallback = primary.get(kind, {}).get(swapped)
+        if fallback is not None:
+            return fallback, f"{key} über {swapped}"
+        fallback = other.get(kind, {}).get(swapped)
+        if fallback is not None:
+            return fallback, f"{key} über {swapped} aus der Tabelle {other_name.upper()}"
+
+    return None, None
+
+
 def compute(oligo: Oligo, registry: Registry | None = None) -> ExtinctionResult:
     """eps260 des ganzen Oligos nach dem Nearest-Neighbor-Modell."""
     reg = registry or get_registry()
@@ -104,8 +153,9 @@ def compute(oligo: Oligo, registry: Registry | None = None) -> ExtinctionResult:
 
     rna_share = sum(1 for m in oligo.monomers if m.spec.typ == "rna")
     table_name = "rna" if rna_share * 2 > oligo.length else "dna"
+    other_name = "dna" if table_name == "rna" else "rna"
     table = tables.get(table_name, {})
-    dimers = table.get("dimers", {})
+    other = tables.get(other_name, {})
     monomers = table.get("monomers", {})
 
     letters, approximated, missing, own_eps = _letters(oligo, reg)
@@ -121,7 +171,11 @@ def compute(oligo: Oligo, registry: Registry | None = None) -> ExtinctionResult:
 
     if oligo.length == 1:
         code = letters[0]
-        value = monomers.get(code) if code else None
+        value = (
+            _lookup(code, "monomers", table, other, table_name, other_name)[0]
+            if code
+            else None
+        )
         return ExtinctionResult(
             eps260=Quantity(
                 value, "L·mol⁻¹·cm⁻¹",
@@ -149,21 +203,31 @@ def compute(oligo: Oligo, registry: Registry | None = None) -> ExtinctionResult:
     total = 0.0
     per_position: list[dict] = []
     unknown_pairs: list[str] = []
+    borrowed: list[str] = []
 
     for i in range(oligo.length - 1):
         pair = f"{letters[i]}{letters[i + 1]}"
-        value = dimers.get(pair)
+        value, reason = _lookup(
+            pair, "dimers", table, other, table_name, other_name
+        )
         if value is None:
             unknown_pairs.append(f"Position {i + 1}-{i + 2}: Paar {pair} fehlt")
             continue
+        if reason:
+            borrowed.append(f"Position {i + 1}-{i + 2}: {reason}")
         total += value
         per_position.append({"position": i + 1, "pair": pair, "eps260": value})
 
     for i in range(1, oligo.length - 1):
-        value = monomers.get(letters[i])
+        letter = letters[i] or ""
+        value, reason = _lookup(
+            letter, "monomers", table, other, table_name, other_name
+        )
         if value is None:
-            unknown_pairs.append(f"Position {i + 1}: Baustein {letters[i]} fehlt")
+            unknown_pairs.append(f"Position {i + 1}: Baustein {letter} fehlt")
             continue
+        if reason:
+            borrowed.append(f"Position {i + 1}: {reason}")
         total -= value
 
     if unknown_pairs:
@@ -179,6 +243,9 @@ def compute(oligo: Oligo, registry: Registry | None = None) -> ExtinctionResult:
             missing=unknown_pairs,
         )
 
+    # Ein Rückgriff auf die andere Tabelle ist nichts anderes als eine Näherung
+    # über das natürliche Analogon — er wird genauso gekennzeichnet.
+    approximated = approximated + borrowed
     reliability = Reliability.APPROX if approximated else Reliability.PARAMETER
     note = None
     if approximated:

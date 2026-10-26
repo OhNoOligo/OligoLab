@@ -281,3 +281,81 @@ def test_hilfe_hat_eintraege_fuer_alle_namensraeume(client):
         assert any(k.startswith(praefix) for k in eintraege)
     for schluessel, eintrag in eintraege.items():
         assert eintrag.get("short"), f"{schluessel} ohne Kurztext"
+
+
+# ----------------------------------------------- Eingaben, die abgewiesen werden
+
+
+@pytest.mark.parametrize("name", ["", "   ", "\t\n"])
+def test_oligo_ohne_namen_wird_abgewiesen(client, name):
+    """Gespeichert wird per Name — ein leerer Name liesse alle namenlosen
+    Eintraege zu einem verschmelzen."""
+    antwort = client.post(
+        "/api/library/oligos", json={"name": name, "sequence": "ACGT"}
+    )
+    assert antwort.status_code == 422
+    assert client.get("/api/library/oligos").json()["oligos"] == []
+
+
+def test_name_wird_beschnitten(client):
+    antwort = client.post(
+        "/api/library/oligos", json={"name": "  DZ 1  ", "sequence": "ACGT"}
+    )
+    assert antwort.json()["name"] == "DZ 1"
+
+
+def test_probe_ohne_namen_wird_abgewiesen(client):
+    antwort = client.post(
+        "/api/library/samples",
+        json={"name": " ", "n_stock_nmol": 1, "v_stock_ul": 10},
+    )
+    assert antwort.status_code == 422
+
+
+def test_baustein_mit_leerem_code_wird_abgewiesen(client):
+    """Auch ein Code aus lauter Leerzeichen ist leer."""
+    for code in ("", "   "):
+        antwort = client.post("/api/monomers", json={"code": code, "mass_residue": 1})
+        assert antwort.status_code == 422, code
+
+
+@pytest.mark.parametrize("feld", ["od", "nmol", "microgram"])
+def test_negative_stoffmenge_wird_abgewiesen(client, feld):
+    antwort = client.post(
+        "/api/concentration/od",
+        json={"eps260": 1000, "molar_mass": 1000, feld: -5},
+    )
+    assert antwort.status_code == 422
+
+
+def test_ladungsbereich_ist_nach_oben_begrenzt(client):
+    assert (
+        client.post(
+            "/api/ms/ladder", json={"sequence": "ACGT", "charge_max": 500}
+        ).status_code
+        == 422
+    )
+
+
+def test_ladungsleiter_nennt_die_chemische_grenze(client):
+    """Mehr negative Ladungen als Phosphate kann ein Oligo nicht tragen."""
+    daten = client.post(
+        "/api/ms/ladder", json={"sequence": "ACGT", "charge_max": 20}
+    ).json()
+    assert daten["max_physical_charge"] == 3
+    assert "Phosphate" in daten["note"]
+
+    ohne_hinweis = client.post(
+        "/api/ms/ladder", json={"sequence": REFERENCE_SEQUENCE, "charge_max": 15}
+    ).json()
+    assert ohne_hinweis["note"] is None
+
+
+def test_bibliothek_nennt_die_gesamtzahl(client):
+    for index in range(3):
+        client.post(
+            "/api/library/oligos",
+            json={"name": f"Oligo {index}", "sequence": "ACGT"},
+        )
+    assert client.get("/api/library/oligos").json()["total"] == 3
+    assert client.get("/api/library/oligos", params={"q": "Oligo 1"}).json()["total"] == 1

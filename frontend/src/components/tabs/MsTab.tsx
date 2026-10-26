@@ -119,6 +119,7 @@ export function MsTab({
   const [chargeMax, setChargeMax] = useState<number | "">(15);
   const [basis, setBasis] = useState<"average" | "monoisotopic">("average");
   const [ladder, setLadder] = useState<{ charge: number; mz: number }[]>([]);
+  const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -138,6 +139,7 @@ export function MsTab({
       .then((result) => {
         if (!cancelled) {
           setLadder(result.ladder);
+          setNote(result.note);
           setError(null);
         }
       })
@@ -196,6 +198,12 @@ export function MsTab({
         </div>
 
         {error && <Notice level="bad">{error}</Notice>}
+
+        {note && (
+          <div className="mb-3">
+            <Notice level="warn">{note}</Notice>
+          </div>
+        )}
 
         {ladder.length > 0 && (
           <table className="ol-table">

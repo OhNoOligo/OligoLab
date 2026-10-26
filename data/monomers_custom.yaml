@@ -1,0 +1,12 @@
+# OligoLab — eigene Bausteine und Aenderungen
+#
+# Diese Datei wird vom Programm geschrieben. Was hier steht, ueberlagert
+# `monomers.yaml` je Code. `monomers.yaml` selbst bleibt die unangetastete
+# Abschrift des Excel.
+#
+# Jeder Eintrag hier gilt als Abweichung von den Excel-Konstanten und wird in
+# der Oberflaeche farblich hervorgehoben.
+
+monomers:
+- code: '  '
+  mass_residue: 1.0

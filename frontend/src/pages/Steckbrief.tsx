@@ -148,13 +148,25 @@ export function Steckbrief() {
                 {oligo.phosphorothioates} × PS
               </Chip>
             )}
-            {oligo?.conjugates.map((conjugate) => (
+            {/* Gleiche Konjugate zusammengefasst — fuenf gleiche Chips
+                nebeneinander sagen nicht mehr als einer mit Anzahl. */}
+            {Object.entries(
+              (oligo?.conjugates ?? []).reduce<Record<string, number>>(
+                (zaehler, conjugate) => ({
+                  ...zaehler,
+                  [conjugate.code]: (zaehler[conjugate.code] ?? 0) + 1,
+                }),
+                {},
+              ),
+            ).map(([code, anzahl]) => (
               <Chip
-                key={conjugate.code}
+                key={code}
                 role="result"
-                title={`${conjugate.name} — zählt nicht zur Basenzahl`}
+                title={`${
+                  oligo?.conjugates.find((c) => c.code === code)?.name ?? code
+                } — zählt nicht zur Basenzahl`}
               >
-                {conjugate.code}
+                {anzahl > 1 ? `${anzahl} × ${code}` : code}
               </Chip>
             ))}
             {busy && (

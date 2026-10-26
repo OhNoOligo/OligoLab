@@ -27,7 +27,7 @@ dann genügt Uvicorn allein.
 Tests:
 
 ```bash
-.venv/bin/python -m pytest          # 149 Fälle
+.venv/bin/python -m pytest          # 171 Fälle
 cd frontend && npm run typecheck
 ```
 

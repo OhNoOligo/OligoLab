@@ -98,6 +98,8 @@ export const api = {
       ladder: { charge: number; mz: number }[];
       isotopes: { mass: number; intensity_rel: number }[];
       formula: string | null;
+      max_physical_charge: number;
+      note: string | null;
     }>("/api/ms/ladder", body),
 
   loadingPage: (body: {
@@ -136,7 +138,7 @@ export const api = {
     request<{ modifications: ModificationSpecView[] }>("/api/modifications"),
 
   libraryOligos: (query?: string) =>
-    request<{ oligos: LibraryOligo[] }>(
+    request<{ total: number; oligos: LibraryOligo[] }>(
       `/api/library/oligos${query ? `?q=${encodeURIComponent(query)}` : ""}`,
     ),
 

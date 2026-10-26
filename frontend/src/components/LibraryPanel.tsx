@@ -22,6 +22,8 @@ export function LibraryPanel({
   onLoad: (entry: LibraryOligo) => void;
 }) {
   const [entries, setEntries] = useState<LibraryOligo[]>([]);
+  // Die Liste ist begrenzt; die Gesamtzahl kommt aus der Datenbank.
+  const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,10 @@ export function LibraryPanel({
   const refresh = useCallback((search: string) => {
     api
       .libraryOligos(search || undefined)
-      .then((result) => setEntries(result.oligos))
+      .then((result) => {
+        setEntries(result.oligos);
+        setTotal(result.total);
+      })
       .catch((cause: unknown) =>
         setError(
           cause instanceof ApiError
@@ -82,7 +87,10 @@ export function LibraryPanel({
   return (
     <Card
       title="Bibliothek"
-      subtitle={`${entries.length} ${entries.length === 1 ? "Eintrag" : "Einträge"}`}
+      subtitle={
+        `${total} ${total === 1 ? "Eintrag" : "Einträge"}` +
+        (entries.length < total ? `, die ${entries.length} neuesten gezeigt` : "")
+      }
       actions={
         <>
           <button

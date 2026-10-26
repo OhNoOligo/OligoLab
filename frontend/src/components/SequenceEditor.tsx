@@ -15,7 +15,7 @@
  * Ueberfahren (CLAUDE.md, Regel 5 — nie stillschweigend ueberspringen).
  */
 
-import { useMemo } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import type { MonomerKlasse, NotationProblem, OligoView } from "../types";
 
 /* Modifikationsfarben — dieselben wie in jeder anderen Ansicht. */
@@ -229,6 +229,40 @@ export function SequenceEditor({
     [value, oligo, problems],
   );
 
+  // Die Farbschicht scrollt nicht von selbst mit. Ohne Kopplung stehen die
+  // Farben auf den falschen Zeichen, sobald die Sequenz laenger ist als das
+  // sichtbare Feld — und bei einem Ziel-Transkript ist sie das immer.
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const syncScroll = useCallback(() => {
+    const overlay = overlayRef.current;
+    const textarea = textareaRef.current;
+    if (!overlay || !textarea) return;
+    overlay.scrollTop = textarea.scrollTop;
+    overlay.scrollLeft = textarea.scrollLeft;
+  }, []);
+
+  // Auch nach jeder Textaenderung: wird der Text kuerzer, springt die
+  // Textarea zurueck, ohne ein Scroll-Ereignis zu senden.
+  useLayoutEffect(syncScroll, [value, nodes, syncScroll]);
+
+  // Beim Tippen wandert der Cursor und die Textarea scrollt mit, ohne dass
+  // `onScroll` immer feuert.
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const handle = () => syncScroll();
+    textarea.addEventListener("input", handle);
+    textarea.addEventListener("keyup", handle);
+    textarea.addEventListener("click", handle);
+    return () => {
+      textarea.removeEventListener("input", handle);
+      textarea.removeEventListener("keyup", handle);
+      textarea.removeEventListener("click", handle);
+    };
+  }, [syncScroll]);
+
   // Beide Schichten tragen exakt dieselben Textmasse, sonst laufen die Zeichen
   // auseinander. Rahmen und Hintergrund gehoeren an den Container: haette die
   // Textarea einen eigenen Hintergrund, wuerde sie die Farbschicht verdecken.
@@ -252,6 +286,7 @@ export function SequenceEditor({
     >
       {/* Die Farbschicht. Liest nur, nimmt keine Eingaben. */}
       <div
+        ref={overlayRef}
         aria-hidden="true"
         className="ol-seq pointer-events-none absolute inset-0 overflow-hidden"
         style={shared}
@@ -261,6 +296,8 @@ export function SequenceEditor({
 
       {/* Die Eingabe. Durchsichtige Schrift, sichtbarer Cursor. */}
       <textarea
+        ref={textareaRef}
+        onScroll={syncScroll}
         className="ol-seq relative block w-full resize-y"
         style={{
           ...shared,

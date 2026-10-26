@@ -15,8 +15,8 @@ import csv
 import io
 from datetime import datetime, timezone
 
-from sqlalchemy import Engine
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlalchemy import Engine, func
+from sqlmodel import Field, Session, SQLModel, col, create_engine, select
 
 from app.config import settings
 
@@ -112,21 +112,54 @@ def save_oligo(
         return record
 
 
+def _like_pattern(query: str) -> str:
+    """Suchtext in ein LIKE-Muster uebersetzen.
+
+    `%` und `_` sind in LIKE Platzhalter. Ein Oligo darf aber "100 % rein"
+    heissen, und ein Unterstrich kommt in Namen staendig vor — beide werden
+    darum maskiert, sonst faende die Suche nach `_` einfach alles.
+    """
+    escaped = (
+        query.strip()
+        .replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+    return f"%{escaped}%"
+
+
 def list_oligos(query: str | None = None, limit: int = 500) -> list[OligoRecord]:
-    """Alle Eintraege, optional durchsucht ueber Name, Sequenz und Notiz."""
+    """Alle Eintraege, optional durchsucht ueber Name, Sequenz und Notiz.
+
+    Gesucht wird in SQL, nicht hinterher in Python. Wuerde erst das Limit
+    greifen und dann der Filter, waeren aeltere Eintraege unauffindbar,
+    sobald die Bibliothek ueber `limit` hinauswaechst.
+    """
     with session() as s:
-        statement = select(OligoRecord).order_by(OligoRecord.updated_at.desc())
-        records = list(s.exec(statement.limit(limit)))
-    if not query:
-        return records
-    needle = query.strip().lower()
-    return [
-        r
-        for r in records
-        if needle in r.name.lower()
-        or needle in r.sequence.lower()
-        or (r.notes or "").lower().find(needle) >= 0
-    ]
+        statement = select(OligoRecord)
+        if query and query.strip():
+            pattern = _like_pattern(query)
+            statement = statement.where(
+                col(OligoRecord.name).ilike(pattern, escape="\\")
+                | col(OligoRecord.sequence).ilike(pattern, escape="\\")
+                | col(OligoRecord.notes).ilike(pattern, escape="\\")
+            )
+        statement = statement.order_by(OligoRecord.updated_at.desc()).limit(limit)
+        return list(s.exec(statement))
+
+
+def count_oligos(query: str | None = None) -> int:
+    """Wie viele Eintraege es wirklich gibt — unabhaengig vom Limit."""
+    with session() as s:
+        statement = select(func.count()).select_from(OligoRecord)
+        if query and query.strip():
+            pattern = _like_pattern(query)
+            statement = statement.where(
+                col(OligoRecord.name).ilike(pattern, escape="\\")
+                | col(OligoRecord.sequence).ilike(pattern, escape="\\")
+                | col(OligoRecord.notes).ilike(pattern, escape="\\")
+            )
+        return int(s.exec(statement).one())
 
 
 def get_oligo(record_id: int) -> OligoRecord | None:
@@ -152,7 +185,7 @@ def oligos_as_csv() -> str:
         ["Name", "Sequenz", "Bausteine", "vollständig entschützt (Da)",
          "Notizen", "angelegt", "geändert"]
     )
-    for r in list_oligos():
+    for r in list_oligos(limit=1_000_000):
         writer.writerow([
             r.name,
             r.sequence,

@@ -21,7 +21,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app import (
     __version__,
@@ -62,6 +62,19 @@ app.add_middleware(
 # ----------------------------------------------------------------- Modelle
 
 
+def _require_name(value: str) -> str:
+    """Ein Name darf nicht leer sein.
+
+    Gespeichert wird per Name: ein leerer Name liesse alle namenlosen
+    Eintraege zu einem verschmelzen, und in der Bibliothek waeren sie weder
+    auseinanderzuhalten noch zu finden.
+    """
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("Der Name darf nicht leer sein.")
+    return stripped
+
+
 class SequenceRequest(BaseModel):
     sequence: str = Field(default="", description="Sequenz in Synthi-Sprache")
     name: str | None = None
@@ -75,8 +88,10 @@ class SynthesisRequest(SequenceRequest):
 
 
 class LadderRequest(SequenceRequest):
-    charge_min: int = Field(default=2, ge=1)
-    charge_max: int = Field(default=15, ge=1)
+    # Nach oben begrenzt: mehr Ladungen als Phosphate kann ein Oligo nicht
+    # tragen, und 100 liegt weit ueber allem, was je sinnvoll ist.
+    charge_min: int = Field(default=2, ge=1, le=100)
+    charge_max: int = Field(default=15, ge=1, le=100)
     basis: Literal["average", "monoisotopic"] = "average"
 
 
@@ -104,9 +119,10 @@ class LcmsLoadingRequest(BaseModel):
 class OdRequest(BaseModel):
     eps260: float = Field(gt=0)
     molar_mass: float = Field(gt=0)
-    od: float | None = None
-    nmol: float | None = None
-    microgram: float | None = None
+    # Eine negative Stoffmenge gibt es nicht.
+    od: float | None = Field(default=None, ge=0)
+    nmol: float | None = Field(default=None, ge=0)
+    microgram: float | None = Field(default=None, ge=0)
 
 
 class AbsorbanceRequest(BaseModel):
@@ -119,12 +135,16 @@ class AbsorbanceRequest(BaseModel):
 class OligoSaveRequest(SequenceRequest):
     name: str
 
+    _check_name = field_validator("name")(_require_name)
+
 
 class SampleSaveRequest(BaseModel):
     name: str
     n_stock_nmol: float = Field(ge=0)
     v_stock_ul: float = Field(gt=0)
     notes: str | None = None
+
+    _check_name = field_validator("name")(_require_name)
 
 
 class MonomerWriteRequest(BaseModel):
@@ -335,11 +355,23 @@ def ms_ladder(request: LadderRequest) -> dict[str, Any]:
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    # Mehr negative Ladungen als Phosphate kann ein Oligo nicht tragen —
+    # die Zeilen darueber stehen zwar da, bedeuten aber nichts.
+    n_phosphate = max(oligo.length - 1, 0)
+    note = None
+    if ladder and request.charge_max > n_phosphate:
+        note = (
+            f"Das Oligo hat {n_phosphate} Phosphate. Ladungen darüber hinaus "
+            "sind rechnerisch, nicht chemisch."
+        )
+
     return {
         "basis": basis.as_dict(4),
         "ladder": ladder,
         "isotopes": exact.isotopes,
         "formula": exact.formula,
+        "max_physical_charge": n_phosphate,
+        "note": note,
     }
 
 
@@ -447,13 +479,15 @@ def write_monomer(request: MonomerWriteRequest) -> dict[str, Any]:
     Geschrieben wird nach `data/monomers_custom.yaml`; `monomers.yaml` bleibt
     die unangetastete Abschrift des Excel (CLAUDE.md, Regel 2).
     """
+    code = request.code.strip()
+    if not code:
+        raise HTTPException(status_code=422, detail="Der Code darf nicht leer sein.")
     entry = {
         key: value
         for key, value in request.model_dump().items()
         if value is not None or key == "code"
     }
-    if len(request.code) == 0:
-        raise HTTPException(status_code=422, detail="Der Code darf nicht leer sein.")
+    entry["code"] = code
     if request.mass_residue is None and request.smiles is None:
         registry = get_registry()
         if registry.monomer(request.code) is None:
@@ -532,6 +566,7 @@ def reload_registry() -> dict[str, Any]:
 @app.get("/api/library/oligos")
 def library_list(q: str | None = Query(default=None)) -> dict[str, Any]:
     return {
+        "total": library.count_oligos(q),
         "oligos": [
             {
                 "id": r.id,

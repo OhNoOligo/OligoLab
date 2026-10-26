@@ -127,3 +127,50 @@ def test_stimmige_mehrfacheingabe_meldet_nichts():
 def test_ohne_eingabe_ist_ein_fehler():
     with pytest.raises(ValueError):
         ex.convert_od(325400.0, 10241.26)
+
+
+# ---------------------------------------- chimäre DNA/RNA-Stränge
+
+
+def test_chimaerer_strang_wird_berechnet(registry):
+    """Ein DNAzym ist fast nie sortenrein.
+
+    Die DNA-Tabelle kennt kein U, die RNA-Tabelle kein T. Ohne Rückgriff auf
+    die jeweils andere Tabelle bliebe jeder gemischte Strang ohne eps260 —
+    und das ist bei einem DNAzym der Normalfall, nicht der Sonderfall.
+    """
+    ergebnis = ex.compute(parse("ACGU", registry), registry)
+    assert ergebnis.eps260.value is not None
+    assert ergebnis.eps260.reliability.value == "genähert über natürliches Analogon"
+    assert any("GU" in eintrag for eintrag in ergebnis.approximated)
+
+
+def test_rueckgriff_nimmt_den_wert_der_anderen_tabelle(registry):
+    """ACGU: AC und CG aus der DNA-Tabelle, GU aus der RNA-Tabelle."""
+    ergebnis = ex.compute(parse("ACGU", registry), registry)
+    # (AC 21 200 + CG 18 000 + GU 21 200) − (C 7 400 + G 11 500) = 41 500
+    assert ergebnis.eps260.value == pytest.approx(41500, abs=1)
+
+
+def test_tu_und_ut_gibt_es_in_keiner_tabelle(registry):
+    """Letzte Stufe: U und T gelten als einander ähnlich genug."""
+    for sequenz in ("TU", "UT"):
+        ergebnis = ex.compute(parse(sequenz, registry), registry)
+        assert ergebnis.eps260.value == pytest.approx(16800, abs=1), sequenz
+        assert ergebnis.eps260.reliability.value == (
+            "genähert über natürliches Analogon"
+        )
+
+
+def test_sortenreine_straenge_bleiben_parameter(registry):
+    """Kein falscher Näherungsvermerk, wo nichts genähert wurde."""
+    for sequenz in ("ACGT", "OIZU"):
+        ergebnis = ex.compute(parse(sequenz, registry), registry)
+        assert ergebnis.eps260.reliability.value == "Parameter vorhanden", sequenz
+        assert ergebnis.approximated == []
+
+
+def test_ohne_analogon_hilft_auch_kein_rueckgriff(registry):
+    """E bleibt unberechenbar — ein Rückgriff darf das nicht verdecken."""
+    ergebnis = ex.compute(parse("ACEGT", registry), registry)
+    assert ergebnis.eps260.value is None
