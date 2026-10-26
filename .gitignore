@@ -11,6 +11,11 @@ venv/
 
 # Daten, die zur Laufzeit entstehen
 data/oligos.db
+
+# Eigene Bausteine und Modifikationen des Nutzers. Die schreibt das Programm,
+# und sie gehoeren dem, der sie eintraegt — nicht ins Repository.
+data/monomers_custom.yaml
+data/modifications_custom.yaml
 data/targets/*
 !data/targets/.gitkeep
 data/structures/*

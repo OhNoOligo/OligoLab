@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 import pytest
 
 from app.registry import Registry
 from app import library
+
+REAL_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 # Die Regressionssequenz aus CLAUDE.md. Ein 10-23-DNAzym:
 # Arm TTGGGGTAA (9) + Kern GGCTAGCTACAACGA (15) + Arm GGTGCATGT (9) = 33.
@@ -40,6 +45,30 @@ def registry() -> Registry:
 @pytest.fixture
 def reference_sequence() -> str:
     return REFERENCE_SEQUENCE
+
+
+@pytest.fixture(autouse=True)
+def _isolated_data_dir(tmp_path, monkeypatch):
+    """Jeder Test arbeitet auf einer Kopie von `data/`.
+
+    Ohne das schreiben Tests, die einen eigenen Baustein anlegen, in die
+    echte `data/monomers_custom.yaml` des Nutzers — und landen beim naechsten
+    Commit mit im Repository. Genau das ist einmal passiert.
+    """
+    from app import registry as registry_module
+    from app.config import settings
+
+    kopie = tmp_path / "data"
+    kopie.mkdir()
+    for datei in REAL_DATA_DIR.glob("*.yaml"):
+        shutil.copy(datei, kopie / datei.name)
+
+    monkeypatch.setattr(settings, "data_dir", kopie)
+    # Die gemeinsame Registry haelt ihr Verzeichnis seit dem ersten Zugriff
+    # fest; sie muss neu gebaut werden, sonst greift die Umlenkung nicht.
+    monkeypatch.setattr(registry_module, "_registry", None)
+    yield
+    monkeypatch.setattr(registry_module, "_registry", None)
 
 
 @pytest.fixture(autouse=True)

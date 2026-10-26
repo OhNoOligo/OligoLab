@@ -364,3 +364,23 @@ def test_bibliothek_nennt_die_gesamtzahl(client):
 def test_unbekannter_endpunkt_bleibt_404(client):
     """Der SPA-Rückfall darf keinen Tippfehler in einer Adresse verdecken."""
     assert client.get("/api/gibtesnicht").status_code == 404
+
+
+def test_tests_schreiben_nicht_ins_echte_datenverzeichnis(client):
+    """Ein angelegter Baustein darf nicht im Projektverzeichnis landen.
+
+    Genau das ist einmal passiert: ein Probelauf schrieb einen Baustein mit
+    dem Code '  ' in die echte `data/monomers_custom.yaml`, und sie wurde
+    mitcommittet.
+    """
+    from .conftest import REAL_DATA_DIR
+
+    antwort = client.post(
+        "/api/monomers",
+        json={"code": "TESTX", "name": "Nur für den Test", "mass_residue": 300.0},
+    )
+    assert antwort.status_code == 200
+
+    # Geschrieben wurde in die Kopie, nicht ins Projektverzeichnis.
+    assert not (REAL_DATA_DIR / "monomers_custom.yaml").exists()
+    assert "TESTX" in {m["code"] for m in client.get("/api/monomers").json()["monomers"]}
