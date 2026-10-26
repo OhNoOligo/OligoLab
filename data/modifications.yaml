@@ -34,7 +34,7 @@ modifications:
     klasse: zucker
     base_parent_required: true
   - code: LNA
-    name: "LNA (verbrueckte Nukleinsaeure)"
+    name: "LNA (verbrückte Nukleinsäure)"
     mass_diff: 12.0
     scope: monomer
     klasse: zucker
@@ -87,7 +87,7 @@ modifications:
 
   # ---- Konjugat ----
   - code: 5GalNAc
-    name: "5'-GalNAc, triantennaer"
+    name: "5'-GalNAc, triantennär"
     # BEWUSST LEER. Die Masse haengt vollstaendig am verwendeten Linker
     # (THA-C6, GalNAc3-1a, ... unterscheiden sich um einige hundert Dalton)
     # und steht im Excel nicht. Einen Wert hier zu erfinden waere genau das,

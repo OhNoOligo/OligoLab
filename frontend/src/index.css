@@ -1,0 +1,260 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   OligoLab — Designsprache aus CLAUDE.md
+   
+   Drei getrennte Farbsaetze, die nie vermischt werden:
+   
+   1. Rollenfarben  gruen fuer Eingaben, grau fuer Einstellungen, blau fuer
+                    Ergebnisse. Nur als Chip-Hintergrund mit 16 % Deckkraft
+                    und als Rahmenfarbe, nie als volle Flaeche.
+   2. Ampel         gruen, gelb, rot — ausschliesslich fuer Bewertungen.
+                    Nie dekorativ.
+   3. Modifikations-
+      farben        gelten in jeder Ansicht gleich: Sequenzfeld, Sequenzkarte,
+                    Paarungsdarstellung und spaeter 3D.
+   
+   Keine Verlaeufe, keine Schatten. Radius 8 px, Abstaende in 8er-Schritten.
+--------------------------------------------------------------------------- */
+
+@theme {
+  --radius-card: 8px;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono",
+    Menlo, Consolas, monospace;
+}
+
+:root {
+  color-scheme: light dark;
+
+  /* Flaechen und Text */
+  --surface: #ffffff;
+  --surface-sunken: #f6f7f8;
+  --border: #d9dce0;
+  --border-strong: #b4b9bf;
+  --text: #16181b;
+  --text-muted: #5d646d;
+  --text-faint: #868d96;
+
+  /* Rollenfarben */
+  --role-input: #1f8a4c;
+  --role-settings: #6b7280;
+  --role-result: #1f6fb2;
+
+  /* Ampel — nur fuer Bewertungen */
+  --rating-good: #1f8a4c;
+  --rating-warn: #b4780a;
+  --rating-bad: #c23030;
+
+  /* Modifikationsfarben — in allen Ansichten gleich */
+  --mod-dna: #6b7280;
+  --mod-rna: #1f6fb2;
+  --mod-sugar: #1f8a4c;
+  --mod-base: #c2690a;
+  --mod-conjugate: #7c4bbf;
+  --mod-unknown: #c23030;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #16181b;
+    --surface-sunken: #1e2126;
+    --border: #32373d;
+    --border-strong: #4a5058;
+    --text: #e8eaed;
+    --text-muted: #a2a9b2;
+    --text-faint: #7d848d;
+
+    --role-input: #4bbd7a;
+    --role-settings: #9aa2ad;
+    --role-result: #5aa5e0;
+
+    --rating-good: #4bbd7a;
+    --rating-warn: #d9a521;
+    --rating-bad: #e8695f;
+
+    --mod-dna: #9aa2ad;
+    --mod-rna: #5aa5e0;
+    --mod-sugar: #4bbd7a;
+    --mod-base: #e09a4b;
+    --mod-conjugate: #a885e0;
+    --mod-unknown: #e8695f;
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface: #16181b;
+  --surface-sunken: #1e2126;
+  --border: #32373d;
+  --border-strong: #4a5058;
+  --text: #e8eaed;
+  --text-muted: #a2a9b2;
+  --text-faint: #7d848d;
+
+  --role-input: #4bbd7a;
+  --role-settings: #9aa2ad;
+  --role-result: #5aa5e0;
+
+  --rating-good: #4bbd7a;
+  --rating-warn: #d9a521;
+  --rating-bad: #e8695f;
+
+  --mod-dna: #9aa2ad;
+  --mod-rna: #5aa5e0;
+  --mod-sugar: #4bbd7a;
+  --mod-base: #e09a4b;
+  --mod-conjugate: #a885e0;
+  --mod-unknown: #e8695f;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- Karte: duenner Rahmen, 8 px Radius, kein Schatten ------------------- */
+.ol-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+/* --- Chip: Rollenfarbe als Rahmen und 16 % Hintergrund ------------------ */
+.ol-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-card);
+  border: 1px solid currentColor;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.ol-role-input { color: var(--role-input); }
+.ol-role-settings { color: var(--role-settings); }
+.ol-role-result { color: var(--role-result); }
+
+.ol-rating-good { color: var(--rating-good); }
+.ol-rating-warn { color: var(--rating-warn); }
+.ol-rating-bad { color: var(--rating-bad); }
+
+/* --- Formularfelder ----------------------------------------------------- */
+.ol-input,
+.ol-select,
+.ol-textarea {
+  width: 100%;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.ol-input:focus-visible,
+.ol-select:focus-visible,
+.ol-textarea:focus-visible,
+.ol-button:focus-visible {
+  outline: 2px solid var(--role-result);
+  outline-offset: 1px;
+}
+
+/* Eingaben tragen die Rollenfarbe gruen, Einstellungen grau. */
+.ol-input[data-role="input"] { border-color: color-mix(in srgb, var(--role-input) 55%, var(--border)); }
+.ol-input[data-role="settings"] { border-color: var(--border); }
+
+.ol-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  padding: 5px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ol-button:hover:not(:disabled) { background: var(--surface-sunken); }
+.ol-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ol-button[data-variant="primary"] {
+  border-color: var(--role-result);
+  color: var(--role-result);
+  background: color-mix(in srgb, var(--role-result) 12%, transparent);
+}
+
+/* --- Sequenz ------------------------------------------------------------ */
+.ol-seq {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 1.9;
+  letter-spacing: 0.08em;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Unbekannte Zeichen: rot unterkringelt. */
+.ol-seq-unknown {
+  color: var(--mod-unknown);
+  text-decoration: underline wavy var(--mod-unknown);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+/* Phosphorothioat: Symbol in der Luecke zwischen zwei Zellen. */
+.ol-seq-ps {
+  color: var(--mod-base);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.ol-mono { font-family: var(--font-mono); }
+
+table.ol-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+table.ol-table th,
+table.ol-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: right;
+}
+
+table.ol-table th:first-child,
+table.ol-table td:first-child { text-align: left; }
+
+table.ol-table th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+table.ol-table tbody tr:last-child td { border-bottom: none; }
+table.ol-table tfoot td {
+  border-top: 1px solid var(--border-strong);
+  border-bottom: none;
+  font-weight: 600;
+}

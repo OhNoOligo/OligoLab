@@ -48,6 +48,7 @@ termini:
     mass: 302.34
     note: "5'-Schutzgruppe, Term `+ DMT`"
   phosphate_offset:
+    name: "Phosphat-Versatz (3'-Phosphat zu 3'-OH)"
     mass: 61.96
     note: >
       Differenz zwischen der Basis (= Summe der Restmassen, entspricht der

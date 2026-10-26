@@ -99,6 +99,15 @@ def test_lcms_braucht_ein_injektionsvolumen():
         )
 
 
+def test_warntexte_schreiben_deutsche_zahlen():
+    """Die Warnung landet unveraendert in der Oberflaeche — dort steht
+    sonst ueberall ein Dezimalkomma."""
+    rezept = loading.page(n_loading_pmol=400, n_stock_nmol=1, v_stock_ul=5)
+    warnung = rezept.warnings[0]
+    assert "1,00 µL" in warnung
+    assert "1.00" not in warnung
+
+
 def test_jede_zahl_traegt_ihre_methode():
     rezept = loading.page(n_loading_pmol=500, n_stock_nmol=50, v_stock_ul=100)
     for groesse in (rezept.oligo_ul, rezept.water_ul, rezept.stock_conc_um):
