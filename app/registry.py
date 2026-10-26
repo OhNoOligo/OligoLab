@@ -37,7 +37,15 @@ EXCEL_CONC = {
 }
 
 
+# Die Ueberlagerungsdateien. Angelegt werden sie erst, wenn der Nutzer etwas
+# eintraegt; fehlen sie, aendert das nichts.
+CUSTOM_MONOMERS_FILE = "monomers_custom.yaml"
+CUSTOM_MODIFICATIONS_FILE = "modifications_custom.yaml"
+
+
 def _read_yaml(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
     with path.open(encoding="utf-8") as fh:
         return yaml.safe_load(fh) or {}
 
@@ -72,8 +80,28 @@ class Registry:
     def _load_monomers(self) -> None:
         raw = _read_yaml(self._data_dir / "monomers.yaml")
         self.protecting_group_by_base = raw.get("protecting_group_by_base", {})
+
+        # Eigene Bausteine und Aenderungen des Nutzers stehen in einer
+        # SEPARATEN Datei. Damit bleibt `monomers.yaml` samt Kommentaren die
+        # unangetastete Abschrift des Excel — und jede Abweichung ist schon
+        # dadurch sichtbar, dass sie woanders steht (CLAUDE.md, Regel 2).
+        overlay = _read_yaml(self._data_dir / CUSTOM_MONOMERS_FILE)
+        entries = list(raw.get("monomers") or [])
+        by_code = {str(e["code"]).upper(): i for i, e in enumerate(entries)}
+        for extra in overlay.get("monomers") or []:
+            code = str(extra["code"]).upper()
+            if code in by_code:
+                merged = dict(entries[by_code[code]])
+                merged.update(extra)
+                entries[by_code[code]] = merged
+            else:
+                entries.append(extra)
+
         self.monomers = {}
-        for entry in raw.get("monomers", []):
+        self.custom_codes = {
+            str(e["code"]).upper() for e in (overlay.get("monomers") or [])
+        }
+        for entry in entries:
             spec = MonomerSpec(
                 code=str(entry["code"]).upper(),
                 name=entry.get("name", entry["code"]),
@@ -104,7 +132,12 @@ class Registry:
 
     def _load_modifications(self) -> None:
         raw = _read_yaml(self._data_dir / "modifications.yaml")
-        entries = list(raw.get("modifications") or []) + list(raw.get("custom") or [])
+        overlay = _read_yaml(self._data_dir / CUSTOM_MODIFICATIONS_FILE)
+        entries = (
+            list(raw.get("modifications") or [])
+            + list(raw.get("custom") or [])
+            + list(overlay.get("modifications") or [])
+        )
         self.modifications = {}
         for entry in entries:
             spec = ModificationSpec(
@@ -183,3 +216,88 @@ def get_registry() -> Registry:
     if _registry is None:
         _registry = Registry()
     return _registry
+
+
+# --------------------------------------------------------------- schreiben
+
+
+def _write_overlay(path: Path, key: str, entry: dict[str, Any], header: str) -> None:
+    """Einen Eintrag in eine Ueberlagerungsdatei schreiben.
+
+    Gleicher Code ersetzt den vorhandenen Eintrag. Geschrieben wird erst in
+    eine Nachbardatei und dann umbenannt, damit ein Abbruch mitten im
+    Schreiben die Datei nicht halb zuruecklaesst.
+    """
+    data = _read_yaml(path)
+    entries = list(data.get(key) or [])
+    code = str(entry["code"])
+    for index, existing in enumerate(entries):
+        if str(existing.get("code")).upper() == code.upper():
+            entries[index] = entry
+            break
+    else:
+        entries.append(entry)
+    data[key] = entries
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with temporary.open("w", encoding="utf-8") as fh:
+        fh.write(header)
+        yaml.safe_dump(data, fh, allow_unicode=True, sort_keys=False)
+    temporary.replace(path)
+
+
+MONOMER_OVERLAY_HEADER = """# OligoLab — eigene Bausteine und Aenderungen
+#
+# Diese Datei wird vom Programm geschrieben. Was hier steht, ueberlagert
+# `monomers.yaml` je Code. `monomers.yaml` selbst bleibt die unangetastete
+# Abschrift des Excel.
+#
+# Jeder Eintrag hier gilt als Abweichung von den Excel-Konstanten und wird in
+# der Oberflaeche farblich hervorgehoben.
+
+"""
+
+MODIFICATION_OVERLAY_HEADER = """# OligoLab — eigene Modifikationen
+#
+# Diese Datei wird vom Programm geschrieben und ergaenzt
+# `modifications.yaml`.
+
+"""
+
+
+def save_monomer(entry: dict[str, Any], data_dir: Path | None = None) -> None:
+    """Einen eigenen Baustein anlegen oder einen vorhandenen aendern."""
+    directory = data_dir or settings.data_dir
+    _write_overlay(
+        directory / CUSTOM_MONOMERS_FILE, "monomers", entry, MONOMER_OVERLAY_HEADER
+    )
+
+
+def save_modification(entry: dict[str, Any], data_dir: Path | None = None) -> None:
+    """Eine eigene Modifikation anlegen oder eine vorhandene aendern."""
+    directory = data_dir or settings.data_dir
+    _write_overlay(
+        directory / CUSTOM_MODIFICATIONS_FILE,
+        "modifications",
+        entry,
+        MODIFICATION_OVERLAY_HEADER,
+    )
+
+
+def remove_monomer_override(code: str, data_dir: Path | None = None) -> bool:
+    """Eine eigene Aenderung zuruecknehmen — der Excel-Wert gilt wieder."""
+    directory = data_dir or settings.data_dir
+    path = directory / CUSTOM_MONOMERS_FILE
+    data = _read_yaml(path)
+    entries = list(data.get("monomers") or [])
+    rest = [e for e in entries if str(e.get("code")).upper() != code.upper()]
+    if len(rest) == len(entries):
+        return False
+    data["monomers"] = rest
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with temporary.open("w", encoding="utf-8") as fh:
+        fh.write(MONOMER_OVERLAY_HEADER)
+        yaml.safe_dump(data, fh, allow_unicode=True, sort_keys=False)
+    temporary.replace(path)
+    return True

@@ -1,0 +1,267 @@
+# OligoLab — alle Hilfetexte an einer Stelle
+#
+# Phase 2 haengt hier die Komponente `<HelpTip id="..." />` ein. Phase 1 legt
+# die Eintraege an und setzt in der Oberflaeche an jedem Formularfeld und jeder
+# Ergebnisgroesse ein `data-help`-Attribut mit der passenden ID, damit spaeter
+# nichts nachgetragen werden muss (CLAUDE.md, Designsprache).
+#
+# Namensraeume
+#   field.*   Eingabefelder und Einstellungen
+#   result.*  Ergebniszahlen
+#   method.*  Verfahren und Kennzeichen
+#
+# Je Eintrag: `short` (zwei bis drei Saetze, erscheint beim Ueberfahren) und
+# optional `long` (das Panel beim Klick).
+
+version: 1
+
+entries:
+  # ----------------------------------------------------------- Eingaben
+  field.sequence:
+    title: "Sequenz"
+    short: >
+      Die Sequenz in Synthi-Sprache, 5' nach 3'. Leerzeichen werden ignoriert,
+      Kleinbuchstaben werden akzeptiert. Jedes unbekannte Zeichen wird rot
+      markiert und nicht übersprungen.
+    long: >
+      A C G T sind DNA, O I Z U sind rA rC rG rU, E und L sind die eigenen
+      Bausteine aus der Monomerdatei. Ein `*` zwischen zwei Zeichen setzt ein
+      Phosphorothioat an genau diese Bindung. `[LNA-T]` setzt einen eigenen
+      Baustein an genau diese Position. `/5GalNAc/` hängt ein Konjugat an —
+      das zählt nicht zur Basenzahl.
+  field.name:
+    title: "Name"
+    short: >
+      Frei wählbar. Unter diesem Namen landet das Oligo in der Bibliothek;
+      ein zweites Speichern mit gleichem Namen überschreibt den Eintrag.
+  field.notes:
+    title: "Notizen"
+    short: >
+      Platz für alles, was zum Strang gehört und nicht in die Sequenz passt:
+      Charge, Reinigung, wofür er gedacht ist.
+  field.coupling_volume:
+    title: "Volumen je Kupplung"
+    short: >
+      Wie viel Amiditlösung der Synthesizer je Kupplung durchzieht.
+      Voreinstellung 0,12 mL. Geht linear in den Verbrauch ein.
+  field.reserve:
+    title: "Reserve"
+    short: >
+      Aufschlag auf die berechnete Masse. Voreinstellung 10 %. Weniger
+      als 10 % ist nicht zu empfehlen — Totvolumen und Wägefehler kommen
+      immer dazu.
+  field.syntheses:
+    title: "Zahl der Synthesen"
+    short: >
+      Reiner Faktor. Zwei Synthesen brauchen doppelt so viel von allem.
+  field.n_stock:
+    title: "n(Stock)"
+    short: >
+      Stoffmenge im Vial, in nmol. Steht meist auf dem Herstellerzettel oder
+      kommt aus der OD-Messung.
+  field.v_stock:
+    title: "V(Stock)"
+    short: >
+      Volumen im Vial, in µL. Zusammen mit n(Stock) ergibt das die
+      Stammkonzentration.
+  field.n_loading:
+    title: "n(Beladung)"
+    short: >
+      Wie viel Stoffmenge aufs Gel soll, in pmol. Für ein normales
+      Analysegel sind einige hundert pmol üblich.
+  field.n_injection:
+    title: "n(Injektion)"
+    short: >
+      Wie viel Stoffmenge auf die Säule soll, in pmol — bezogen auf das
+      Injektionsvolumen, nicht auf das ganze Probenvolumen.
+  field.v_sample:
+    title: "V(Probe)"
+    short: >
+      Gesamtvolumen, das im Vial angesetzt wird. Daraus zieht der Autosampler
+      das Injektionsvolumen.
+  field.v_injection:
+    title: "V(Injektion)"
+    short: >
+      Volumen, das der Autosampler tatsächlich injiziert. Muss kleiner sein
+      als das Probenvolumen.
+  field.charge_range:
+    title: "Ladungsbereich"
+    short: >
+      Welche Ladungszustände die Leiter zeigt. Bei einem 30mer im negativen
+      Modus liegt das Maximum meist zwischen 5− und 12−.
+  field.path_length:
+    title: "Schichtdicke"
+    short: >
+      Weg des Lichts durch die Probe, in cm. Eine normale Küvette hat 1 cm,
+      Tropfenmessgeräte oft 0,1 mm oder 1 mm.
+  field.monomer_code:
+    title: "Code"
+    short: >
+      Der Buchstabe oder Name, mit dem der Baustein in der Sequenz
+      geschrieben wird. Ein Zeichen geht direkt, längere Codes in
+      eckigen Klammern.
+  field.mass_residue:
+    title: "Restmasse"
+    short: >
+      Masse der Kettenbaueinheit, also Nukleosid-3'-phosphat minus Wasser.
+      Das ist der Wert, mit dem die Massenrechnung arbeitet.
+  field.mass_amidite:
+    title: "Amiditmasse"
+    short: >
+      Molmasse des geschützten Amidits, wie es in der Flasche ist. Geht nur
+      in den Verbrauchsrechner ein, nicht in die Masse des Oligos.
+  field.conc_molar:
+    title: "Kupplungskonzentration"
+    short: >
+      Konzentration der angesetzten Amiditlösung in mol/L. Übliche Werte
+      liegen zwischen 0,05 und 0,10.
+  field.eps260:
+    title: "ε₂₆₀ des Bausteins"
+    short: >
+      Eigener Extinktionskoeffizient bei 260 nm. Bleibt das Feld leer, rechnet
+      OligoLab über das natürliche Analogon und kennzeichnet das Ergebnis
+      als genähert.
+
+  # ----------------------------------------------------------- Ergebnisse
+  result.fully_deprotected:
+    title: "vollständig entschützt"
+    short: >
+      Masse des fertigen Oligos nach der Entschützung, mit freiem 5'-OH und
+      freiem 3'-OH, als freie Säure. Das ist der Wert, den man gegen das
+      LC-MS hält.
+    long: >
+      Gerechnet als Basis minus 61,96. Die 61,96 sind die Differenz zwischen
+      der 3'-Phosphat-Form und der Form mit freiem 3'-OH, chemisch
+      HPO₃ − H₂O. In der Massenspektrometrie sieht man meist das Natriumsalz;
+      dafür steht der Wert daneben.
+  result.plus_dmt:
+    title: "+ DMT"
+    short: >
+      Masse mit der Dimethoxytritylgruppe noch am 5'-Ende, 302,34 schwerer.
+      Relevant, solange nicht entschützt wurde.
+  result.plus_3_phosphate:
+    title: "+ 3'-Phosphat"
+    short: >
+      Masse mit einem Phosphat am 3'-Ende. Das ist gleichzeitig die Basis
+      der Rechnung, also die reine Summe der Restmassen.
+  result.protected_dmt_off:
+    title: "geschützt, DMT off"
+    short: >
+      Masse am Ende der Synthese: alle Basenschutzgruppen und alle
+      Cyanoethylgruppen noch dran, DMT bereits abgespalten.
+  result.protected_ce:
+    title: "geschützt, ohne CE"
+    short: >
+      Wie geschützt mit DMT off, aber ohne die Cyanoethylgruppen am Phosphat.
+      Das sind 53,03 je internukleotidischer Bindung.
+  result.exact_mono:
+    title: "monoisotopische Masse"
+    short: >
+      Masse mit dem jeweils häufigsten Isotop jedes Elements. Das ist der
+      erste Peak im hochauflösenden Spektrum, nicht der höchste.
+  result.exact_average:
+    title: "mittlere Masse"
+    short: >
+      Masse mit dem Häufigkeitsmittel der Isotope. Bei einem 30mer ist das
+      der Wert, den ein niedrig auflösendes Spektrum liefert.
+  result.sodium_salt:
+    title: "Natriumsalz"
+    short: >
+      Freie Säure mit Natrium an den Phosphaten statt Wasserstoff, also
+      minus n·H plus n·Na. n ist die Zahl der Phosphate und Phosphorothioate.
+  result.difference:
+    title: "Differenz"
+    short: >
+      Mittlere Masse aus der Summenformel minus Excel-Rechnung. Unter 0,5 Da
+      gilt die Rechnung als bestätigt, darüber lohnt ein Blick in die
+      Aufschlüsselung je Baustein.
+    long: >
+      Die Excel-Konstanten bleiben verbindlich. Eine Differenz wird angezeigt
+      und nicht wegkorrigiert. Die Tabelle darunter zeigt je Synthi-Buchstabe,
+      wie weit die Excel-Restmasse von der Summenformel abweicht und wie viel
+      das bei dieser Sequenz ausmacht.
+  result.isotope_pattern:
+    title: "Isotopenmuster"
+    short: >
+      Die fünf häufigsten Peaks mit ihrer relativen Intensität. Bei einem
+      Oligo dieser Größe ist der höchste Peak nicht der monoisotopische.
+  result.charge_ladder:
+    title: "Ladungsleiter"
+    short: >
+      Erwartete m/z-Werte im negativen ESI, gerechnet als
+      (M − n·1,00794) / n.
+  result.consumption_mass:
+    title: "Masse je Baustein"
+    short: >
+      Volumen · Konzentration · Amiditmasse. In den Einheiten der Tabelle
+      kommt das direkt in mg heraus.
+  result.consumption_total:
+    title: "Summe"
+    short: >
+      Gesamtmasse aller Amidite für diese Synthese. Immer mindestens 10 %
+      aufschlagen.
+  result.eps260:
+    title: "ε₂₆₀"
+    short: >
+      Extinktionskoeffizient des ganzen Oligos bei 260 nm, nach dem
+      Nearest-Neighbor-Modell. Grundlage jeder Umrechnung von A₂₆₀ in
+      Konzentration.
+  result.od_nmol_ug:
+    title: "OD, nmol, µg"
+    short: >
+      Zwei der drei Felder eingeben, das dritte kommt heraus. Die Umrechnung
+      läuft über ε₂₆₀ und die molare Masse.
+  result.loading_oligo:
+    title: "V(Oligo)"
+    short: >
+      Wie viel Stammlösung pipettiert wird. Bleiben danach weniger als 4 µL
+      im Vial, wird gewarnt.
+  result.loading_water:
+    title: "V(Wasser)"
+    short: >
+      Rest bis zum Zielvolumen. Ein negativer Wert heißt: die Stammlösung ist
+      zu verdünnt für diese Beladung.
+
+  # ----------------------------------------------------------- Verfahren
+  method.reliability:
+    title: "Verlässlichkeit"
+    short: >
+      Jede Zahl trägt eines von drei Kennzeichen: exakt, Parameter vorhanden,
+      oder genähert über ein natürliches Analogon. Bei modifizierten Oligos
+      ist das die wichtigste Information auf dem Schirm.
+    long: >
+      `exakt` heißt: rein gerechnet, ohne Tabellenwert — etwa eine Masse aus
+      der Summenformel oder eine Umrechnung nach Lambert-Beer.
+      `Parameter vorhanden` heißt: es gibt einen hinterlegten Wert für genau
+      diesen Baustein, etwa die Restmasse aus dem Excel.
+      `genähert über natürliches Analogon` heißt: für diesen Baustein gibt es
+      keinen eigenen Wert, gerechnet wurde mit dem der unmodifizierten Base.
+      Eine Summe ist nie verlässlicher als ihr schwächster Beitrag.
+  method.excel_constants:
+    title: "Excel-Konstanten"
+    short: >
+      Rest-, Amidit- und Schutzgruppenmassen stammen unverändert aus dem
+      bestehenden Excel-Rechner und werden nicht korrigiert. Eigene
+      Änderungen landen in einer eigenen Datei und werden hervorgehoben.
+  method.nearest_neighbor:
+    title: "Nearest-Neighbor-Modell"
+    short: >
+      ε₂₆₀ aus den Nachbarpaaren: Summe über alle Paare minus die inneren
+      Einzelbausteine. Genauer als das bloße Addieren der Einzelwerte, weil
+      benachbarte Basen sich gegenseitig beeinflussen.
+  method.base_parent:
+    title: "Natürliches Analogon"
+    short: >
+      Zu welcher unmodifizierten Base ein Baustein gehört. Darüber laufen
+      alle Näherungen: Schutzgruppen, ε₂₆₀ und später die Faltung.
+  method.phosphorothioate:
+    title: "Phosphorothioat"
+    short: >
+      Sitzt an der Bindung zwischen zwei Bausteinen, nicht am Baustein selbst.
+      Darum steht das Symbol in der Lücke. In der Masse ein Sauerstoff gegen
+      einen Schwefel, im Excel als +16 hinterlegt.
+  method.conjugate:
+    title: "Konjugat"
+    short: >
+      Hängt am Ende und zählt nicht zur Basenzahl. Bekommt auch keine
+      Schutzgruppe zugeordnet.

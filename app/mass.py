@@ -186,6 +186,12 @@ def compute_basis(
     bd.protecting_base = bd.n_a * bz + bd.n_g * ibu + bd.n_c * ac
     bd.protecting_cyanoethyl = reg.cyanoethyl_mass * max(oligo.length - 1, 0)
 
+    if not oligo.monomers:
+        # Ohne Bausteine gibt es keine Basis. Sonst kaeme hier die 0 heraus und
+        # `fully_deprotected` waere -61,96 Da — eine Zahl, die nichts bedeutet.
+        bd.missing.append("Keine Bausteine — es gibt nichts zu rechnen.")
+        return None, bd, Reliability.MISSING
+
     reliability = worst(*flags) if flags else Reliability.MISSING
     basis = None if bd.missing else bd.basis
     return basis, bd, reliability
