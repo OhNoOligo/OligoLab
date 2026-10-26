@@ -1,0 +1,68 @@
+# OligoLab — Extinktionskoeffizienten bei 260 nm
+#
+# Einheit durchgehend L·mol^-1·cm^-1.
+#
+# Das Nearest-Neighbor-Modell rechnet
+#
+#   eps260 = SUMME(i=1..N-1) eps(d_i d_i+1) - SUMME(i=2..N-1) eps(d_i)
+#
+# also ueber alle Nachbarpaare minus die inneren Einzelbausteine. Die
+# Dimerwerte stammen aus der klassischen Tabelle (Cantor, Warshaw & Shapiro
+# 1970; Monomerwerte nach Cavaluzzi & Borer 2004), so wie sie auch die
+# ueblichen Oligo-Rechner verwenden.
+#
+# Diese Werte stehen NICHT im Excel. Sie sind damit Parameter dieses Programms
+# und werden als `Parameter vorhanden` gekennzeichnet, nicht als `exakt`.
+
+version: 1
+quelle_global: >
+  Dimere: Cantor, Warshaw & Shapiro, Biopolymers 1970.
+  Monomere: Cavaluzzi & Borer, Nucleic Acids Res 2004.
+
+dna:
+  monomers:
+    A: 15400
+    C: 7400
+    G: 11500
+    T: 8700
+  dimers:
+    AA: 27400
+    AC: 21200
+    AG: 25000
+    AT: 22800
+    CA: 21200
+    CC: 14600
+    CG: 18000
+    CT: 15200
+    GA: 25200
+    GC: 17600
+    GG: 21600
+    GT: 20000
+    TA: 23400
+    TC: 16200
+    TG: 19000
+    TT: 16800
+
+rna:
+  monomers:
+    A: 15400
+    C: 7200
+    G: 11500
+    U: 9900
+  dimers:
+    AA: 27400
+    AC: 21000
+    AG: 25000
+    AU: 24000
+    CA: 21000
+    CC: 14200
+    CG: 17800
+    CU: 16200
+    GA: 25200
+    GC: 17400
+    GG: 21600
+    GU: 21200
+    UA: 24600
+    UC: 17200
+    UG: 20000
+    UU: 19600

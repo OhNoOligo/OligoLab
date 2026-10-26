@@ -1,0 +1,166 @@
+# OligoLab — Bausteine (Monomere)
+#
+# Die Werte unter `mass_residue`, `mass_amidite` und `conc_molar` sind
+# UNVERAENDERT aus dem bestehenden Excel-Rechner uebernommen und gelten als
+# verbindlich (CLAUDE.md, Regel 2). Sie werden hier nicht "korrigiert".
+#
+# `formula_residue` ist die Summenformel der Kettenbaueinheit, also
+# Nukleosid-3'-monophosphat minus Wasser. Sie dient allein der unabhaengigen
+# Gegenrechnung in `app/mass_exact.py`. Weicht die daraus berechnete Masse von
+# `mass_residue` ab, ist das ein ANZEIGEFALL, keine Korrektur.
+#
+# `smiles` ist das freie Nukleosid (5'-OH, 3'-OH). Fehlt `formula_residue`,
+# wird die Restformel daraus als Nukleosid + HPO3 - H2O abgeleitet.
+#
+# `core_tested`: ja / nein / unbekannt — ist der Baustein im katalytischen Kern
+# des 10-23 erprobt? Wird ab Phase 3 fuer die kritischen Befunde gebraucht.
+
+version: 1
+quelle_global: "Excel-Rechner (Bestand), Stand der Uebernahme 2026-10"
+
+# Schutzgruppe je Basenelternteil. Die Massen stehen in protecting_groups.yaml.
+# Treibt den Term n_A*104.03 + n_G*70.05 + n_C*42.02 in mass.py, damit auch
+# modifizierte Bausteine ueber `base_parent` richtig mitgezaehlt werden.
+protecting_group_by_base:
+  A: Bz
+  C: Ac
+  G: iBu
+  T: null
+  U: null
+
+monomers:
+  # ---------------- DNA ----------------
+  - code: A
+    name: "dA — Desoxyadenosin"
+    typ: dna
+    mass_residue: 312.05
+    mass_amidite: 857.95
+    conc_molar: 0.05
+    formula_residue: C10H12N5O5P
+    eps260: 15400
+    base_parent: A
+    core_tested: ja
+    smiles: "Nc1ncnc2n(cnc12)[C@H]1C[C@H](O)[C@@H](CO)O1"
+    quelle: "Excel; eps260 Cavaluzzi & Borer 2004"
+
+  - code: C
+    name: "dC — Desoxycytidin"
+    typ: dna
+    mass_residue: 289.18
+    mass_amidite: 771.85
+    conc_molar: 0.05
+    formula_residue: C9H12N3O6P
+    eps260: 7400
+    base_parent: C
+    core_tested: ja
+    smiles: "Nc1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)n1"
+    quelle: "Excel; eps260 Cavaluzzi & Borer 2004"
+
+  - code: G
+    name: "dG — Desoxyguanosin"
+    typ: dna
+    mass_residue: 328.05
+    mass_amidite: 839.92
+    conc_molar: 0.05
+    formula_residue: C10H12N5O6P
+    eps260: 11500
+    base_parent: G
+    core_tested: ja
+    smiles: "Nc1nc2n(cnc2c(=O)[nH]1)[C@H]1C[C@H](O)[C@@H](CO)O1"
+    quelle: "Excel; eps260 Cavaluzzi & Borer 2004"
+
+  - code: T
+    name: "dT — Thymidin"
+    typ: dna
+    mass_residue: 303.04
+    mass_amidite: 744.83
+    conc_molar: 0.05
+    formula_residue: C10H13N2O7P
+    eps260: 8700
+    base_parent: T
+    core_tested: ja
+    smiles: "Cc1cn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]c1=O"
+    quelle: "Excel; eps260 Cavaluzzi & Borer 2004"
+
+  # ---------------- RNA (Synthi-Buchstaben) ----------------
+  - code: O
+    name: "rA — Adenosin"
+    typ: rna
+    mass_residue: 328.05
+    mass_amidite: 887.97
+    conc_molar: 0.07
+    formula_residue: C10H12N5O6P
+    eps260: 15400
+    base_parent: A
+    core_tested: unbekannt
+    smiles: "Nc1ncnc2n(cnc12)[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1O"
+    quelle: "Excel; eps260 Cavaluzzi & Borer 2004"
+
+  - code: I
+    name: "rC — Cytidin"
+    typ: rna
+    mass_residue: 304.03
+    mass_amidite: 801.88
+    conc_molar: 0.07
+    formula_residue: C9H12N3O7P
+    eps260: 7200
+    base_parent: C
+    core_tested: unbekannt
+    smiles: "Nc1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)n1"
+    quelle: "Excel; eps260 Cavaluzzi & Borer 2004"
+
+  - code: Z
+    name: "rG — Guanosin"
+    typ: rna
+    mass_residue: 344.04
+    mass_amidite: 869.97
+    conc_molar: 0.07
+    formula_residue: C10H12N5O7P
+    eps260: 11500
+    base_parent: G
+    core_tested: unbekannt
+    smiles: "Nc1nc2n(cnc2c(=O)[nH]1)[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1O"
+    quelle: "Excel; eps260 Cavaluzzi & Borer 2004"
+
+  - code: U
+    name: "rU — Uridin"
+    typ: rna
+    mass_residue: 305.02
+    mass_amidite: 760.82
+    conc_molar: 0.07
+    formula_residue: C9H11N2O8P
+    eps260: 9900
+    base_parent: U
+    core_tested: unbekannt
+    smiles: "O=c1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)[nH]1"
+    quelle: "Excel; eps260 Cavaluzzi & Borer 2004"
+
+  # ---------------- Eigene Bausteine ----------------
+  # E und L stehen so im Excel. Summenformel und SMILES sind dort nicht
+  # hinterlegt; die Felder bleiben leer. Die Restmasse gilt trotzdem
+  # (PHASEN.md 1.1). Die Gegenrechnung meldet sie dann als unvollstaendig.
+  - code: E
+    name: "E — eigener Baustein"
+    typ: custom
+    mass_residue: 250.00
+    mass_amidite: 948.85
+    conc_molar: 0.10
+    formula_residue: null
+    eps260: null
+    base_parent: null
+    core_tested: unbekannt
+    smiles: null
+    quelle: "Excel; Struktur dort nicht hinterlegt"
+
+  - code: L
+    name: "L — eigener Baustein"
+    typ: custom
+    mass_residue: 371.04
+    mass_amidite: 800.00
+    conc_molar: 0.07
+    formula_residue: null
+    eps260: null
+    base_parent: null
+    core_tested: unbekannt
+    smiles: null
+    quelle: "Excel; Struktur dort nicht hinterlegt"

@@ -1,0 +1,113 @@
+# OligoLab — Modifikationen als Massendifferenz
+#
+# Alle `mass_diff`-Werte unveraendert aus dem Excel-Rechner (CLAUDE.md, Regel 2).
+#
+# `scope`
+#   monomer   — wirkt an genau einer Position
+#   linkage   — wirkt an genau einer internukleotidischen Bindung
+#   terminus  — Endmodifikation oder Konjugat
+#
+# `counts_as_base: false` heisst: der Eintrag zaehlt NICHT zur Basenzahl L
+# und bekommt keine Schutzgruppe zugeordnet (PHASEN.md 1.1).
+
+version: 1
+quelle_global: "Excel-Rechner (Bestand)"
+
+modifications:
+  # ---- Zuckermodifikationen ----
+  - code: RNA
+    name: "2'-OH (RNA)"
+    mass_diff: 16.0
+    scope: monomer
+    klasse: zucker
+    base_parent_required: true
+  - code: OMe
+    name: "2'-O-Methyl"
+    mass_diff: 30.0
+    scope: monomer
+    klasse: zucker
+    base_parent_required: true
+  - code: MOE
+    name: "2'-O-Methoxyethyl"
+    mass_diff: 74.04
+    scope: monomer
+    klasse: zucker
+    base_parent_required: true
+  - code: LNA
+    name: "LNA (verbrueckte Nukleinsaeure)"
+    mass_diff: 12.0
+    scope: monomer
+    klasse: zucker
+    base_parent_required: true
+    core_tested: nein
+    note: >
+      Im katalytischen Kern des 10-23 nicht erprobt. Phase 3 meldet eine
+      kritische Warnung, wenn dieser Eintrag im Kern sitzt.
+  - code: TBDMS
+    name: "2'-O-TBDMS"
+    mass_diff: 114.09
+    scope: monomer
+    klasse: zucker
+    base_parent_required: true
+
+  # ---- Rueckgratmodifikationen ----
+  - code: Thioat
+    name: "Phosphorothioat"
+    mass_diff: 16.0
+    scope: linkage
+    klasse: rueckgrat
+    note: >
+      Wird in der Synthi-Sprache mit `*` zwischen zwei Zeichen geschrieben.
+      Zaehlt je Bindung einmal.
+  - code: Me-Phosphonat
+    name: "Methylphosphonat"
+    mass_diff: -2.0
+    scope: linkage
+    klasse: rueckgrat
+
+  # ---- Farbstoffe / Endmodifikationen ----
+  - code: 6-FAM
+    name: "6-Carboxyfluorescein"
+    mass_diff: 537.46
+    scope: terminus
+    klasse: konjugat
+    counts_as_base: false
+  - code: TET
+    name: "Tetrachlorfluorescein"
+    mass_diff: 675.24
+    scope: terminus
+    klasse: konjugat
+    counts_as_base: false
+  - code: HEX
+    name: "Hexachlorfluorescein"
+    mass_diff: 744.13
+    scope: terminus
+    klasse: konjugat
+    counts_as_base: false
+
+  # ---- Konjugat ----
+  - code: 5GalNAc
+    name: "5'-GalNAc, triantennaer"
+    # BEWUSST LEER. Die Masse haengt vollstaendig am verwendeten Linker
+    # (THA-C6, GalNAc3-1a, ... unterscheiden sich um einige hundert Dalton)
+    # und steht im Excel nicht. Einen Wert hier zu erfinden waere genau das,
+    # was CLAUDE.md Regel 2 und Regel 5 verbieten.
+    #
+    # Zum Eintragen des eigenen Konstrukts: entweder
+    #   mass_diff: <gemessene oder berechnete Masse des Konjugats>
+    # oder
+    #   formula: <Summenformel, z. B. C102H173N7O47>
+    # Danach rechnet alles automatisch mit; bis dahin meldet OligoLab die
+    # Masse als unvollstaendig und nennt diesen Eintrag beim Namen.
+    mass_diff: null
+    formula: null
+    scope: terminus
+    klasse: konjugat
+    counts_as_base: false
+    base_parent: null
+    needs_review: true
+    quelle: "im Excel nicht hinterlegt — vom Nutzer zu ergaenzen"
+
+# Freie Plaetze fuer eigene Modifikationen. Ueber die Oberflaeche
+# (Seite "Bausteine") oder direkt hier eintragen: Name + Massendifferenz.
+custom: []

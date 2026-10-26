@@ -1,0 +1,55 @@
+# OligoLab — Schutzgruppen
+# Massen unveraendert aus dem Excel-Rechner (CLAUDE.md, Regel 2).
+
+version: 1
+quelle_global: "Excel-Rechner (Bestand)"
+
+groups:
+  - code: Bz
+    name: "Benzoyl"
+    mass: 104.03
+    typ: base
+    note: "Standard-Schutzgruppe an dA/dC"
+  - code: Ac
+    name: "Acetyl"
+    mass: 42.02
+    typ: base
+    note: "Standard-Schutzgruppe an dC"
+  - code: iBu
+    name: "Isobutyryl"
+    mass: 70.05
+    typ: base
+    note: "Standard-Schutzgruppe an dG"
+  - code: dmf
+    name: "Dimethylformamidin"
+    mass: 56.06
+    typ: base
+    note: "Alternative Amidin-Schutzgruppe an dG"
+  - code: CE
+    name: "2-Cyanoethyl"
+    mass: 53.03
+    typ: phosphate
+    note: "Phosphatschutz, sitzt an jeder internukleotidischen Bindung (L-1)"
+  - code: PAC
+    name: "Phenoxyacetyl"
+    mass: 134.04
+    typ: base
+  - code: TBDMS
+    name: "tert-Butyldimethylsilyl"
+    mass: 114.09
+    typ: sugar
+    note: "2'-OH-Schutz an RNA-Bausteinen"
+
+# Endgruppen, die in der Excel-Rechnung als feste Terme auftauchen.
+# Siehe app/mass.py — dort stehen sie als benannte Konstanten.
+termini:
+  DMT:
+    name: "4,4'-Dimethoxytrityl"
+    mass: 302.34
+    note: "5'-Schutzgruppe, Term `+ DMT`"
+  phosphate_offset:
+    mass: 61.96
+    note: >
+      Differenz zwischen der Basis (= Summe der Restmassen, entspricht der
+      3'-Phosphat-Form) und dem vollstaendig entschuetzten Oligo mit 3'-OH.
+      Chemisch HPO3 - H2O = 61.97.

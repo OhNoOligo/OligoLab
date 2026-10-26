@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Lokale Konfiguration mit Maschinenpfaden
+.env.local
+
+# Daten, die zur Laufzeit entstehen
+data/oligos.db
+data/targets/*
+!data/targets/.gitkeep
+data/structures/*
+!data/structures/.gitkeep
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/node_modules/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

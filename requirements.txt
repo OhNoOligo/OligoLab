@@ -1,0 +1,14 @@
+# OligoLab — Backend. Alles laeuft lokal, keine kostenpflichtige API.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlmodel>=0.0.22
+pydantic-settings>=2.4
+PyYAML>=6.0
+rdkit>=2024.3
+
+# Ab Phase 4/5
+biopython>=1.84
+
+# Tests
+pytest>=8.0
+httpx>=0.27
