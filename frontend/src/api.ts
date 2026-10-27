@@ -6,9 +6,15 @@
  */
 
 import type {
+  AccessibilityView,
   ConsumptionTable,
   CoreSpecView,
+  FetchResultView,
+  LibraryTarget,
   StrandView,
+  TargetFoldView,
+  TargetView,
+  UpView,
   HelpEntry,
   LibraryOligo,
   LibrarySample,
@@ -88,6 +94,53 @@ export const api = {
     }),
 
   cores: () => request<{ cores: CoreSpecView[] }>("/api/cores"),
+
+  /* ------------------------------------------------------ Ziel-RNA */
+
+  targetRead: (text: string, name?: string) =>
+    post<{ target: TargetView; detected_format: string }>("/api/target/read", {
+      text,
+      name,
+    }),
+
+  targetFetch: (body: {
+    source: "ensembl" | "ncbi" | "rnacentral";
+    identifier: string;
+    species?: string;
+  }) => post<FetchResultView>("/api/target/fetch", body),
+
+  targetFold: (sequence: string, start?: number, end?: number) =>
+    post<TargetFoldView>("/api/target/fold", { sequence, start, end }),
+
+  targetAccessibility: (body: {
+    sequence: string;
+    start?: number;
+    end?: number;
+    probe_length?: number;
+    window?: number;
+    max_span?: number;
+  }) => post<AccessibilityView>("/api/target/accessibility", body),
+
+  targetUp: (body: {
+    target_sequence: string;
+    site_start: number;
+    site_end: number;
+    oligo_sequence: string;
+    temperature_c?: number;
+  }) => post<UpView>("/api/target/up", body),
+
+  libraryTargets: (query?: string) =>
+    request<{ total: number; targets: LibraryTarget[] }>(
+      `/api/library/targets${query ? `?q=${encodeURIComponent(query)}` : ""}`,
+    ),
+
+  saveTarget: (body: Record<string, unknown>) =>
+    post<{ id: number; name: string }>("/api/library/targets", body),
+
+  deleteTarget: (id: number) =>
+    request<{ deleted: number }>(`/api/library/targets/${id}`, {
+      method: "DELETE",
+    }),
 
   profile: (sequence: string, name?: string, notes?: string) =>
     post<Profile>("/api/profile", { sequence, name, notes }),

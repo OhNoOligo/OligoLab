@@ -154,6 +154,28 @@ entries:
       Ausschnitt der Ziel-RNA, auf den gerechnet wird. Bei Transkripten von
       mehreren Kilobasen spart das viel Zeit.
 
+  field.probe_length:
+    title: "Sondenlänge"
+    short: >
+      Wie lang der Arm ist, der an dieser Stelle binden soll. Das
+      Zugänglichkeitsprofil fragt dann: ist ab hier ein Fenster dieser Länge
+      offen? Voreinstellung 15.
+  field.plfold_window:
+    title: "Fensterbreite"
+    short: >
+      Wie weit RNAplfold beim Falten um jede Position herumschaut. Größer
+      heißt genauer und langsamer. Voreinstellung 80.
+    long: >
+      RNAplfold faltet nicht das ganze Transkript, sondern gleitende
+      Fenster — deshalb läuft es auch über Kilobasen in Sekunden. Die
+      Fensterbreite bestimmt, welche Fernkontakte noch gesehen werden; was
+      weiter auseinanderliegt, bleibt unberücksichtigt.
+  field.plfold_span:
+    title: "Maximalspannweite"
+    short: >
+      Wie weit ein Basenpaar höchstens reichen darf. Kann nicht größer sein
+      als die Fensterbreite. Voreinstellung 40.
+
   # ----------------------------------------------------------- Ergebnisse
   result.fully_deprotected:
     title: "vollständig entschützt"
@@ -286,6 +308,19 @@ entries:
     short: >
       Struktur, Energien und Paarungswahrscheinlichkeiten, gerechnet mit
       ViennaRNA und DNA-Parametern.
+
+  result.accessibility:
+    title: "Zugänglichkeit"
+    short: >
+      Je Position: wie wahrscheinlich ist es, dass ab hier die nächsten L
+      Nukleotide offen sind? Hoch heißt offen, also gut erreichbar.
+    long: >
+      Das Profil ist am Fensteranfang verankert: der Wert an Position p sagt,
+      wie es um p bis p+L-1 steht. ViennaRNA gibt die Wahrscheinlichkeit für
+      das Fenster zurück, das AN einer Position endet — würde das nicht
+      umgerechnet, läge das ganze Profil um L-1 Positionen verschoben und man
+      legte die Sonde an die falsche Stelle. Die letzten L-1 Positionen haben
+      kein volles Fenster mehr und bleiben leer.
 
   # ----------------------------------------------------------- Verfahren
   method.stale:

@@ -360,3 +360,98 @@ export interface StrandView {
   folding: FoldingView | null;
   critical: CriticalView | null;
 }
+
+/* ------------------------------------------------------- Seite "Ziel" */
+
+export type RegionKind = "5utr" | "cds" | "3utr" | "other";
+
+export interface RegionView {
+  kind: RegionKind;
+  label: string;
+  start: number;
+  end: number;
+  length: number;
+}
+
+export interface TargetView {
+  name: string;
+  sequence: string;
+  length: number;
+  source: string;
+  identifier: string | null;
+  fetched_at: string | null;
+  regions: RegionView[];
+  organism: string | null;
+  description: string | null;
+  note: string | null;
+}
+
+export interface FetchChoice {
+  id: string;
+  name: string;
+  biotype: string | null;
+  length: number;
+  canonical: boolean;
+  longest: boolean;
+}
+
+export interface FetchResultView {
+  available: boolean;
+  target: TargetView | null;
+  choices: FetchChoice[];
+  from_cache: boolean;
+  message: string | null;
+}
+
+export interface TargetFoldView {
+  available: boolean;
+  start: number;
+  end: number;
+  length: number;
+  structure: string | null;
+  mfe: Quantity | null;
+  ensemble_energy: Quantity | null;
+  note: string | null;
+}
+
+export interface AccessibilityView {
+  available: boolean;
+  start: number;
+  end: number;
+  probe_length: number;
+  window: number;
+  max_span: number;
+  /** Je Position: Wahrscheinlichkeit, dass ab hier L Nukleotide offen sind. */
+  profile: (number | null)[];
+  unpaired: number[];
+  chunks: number;
+  seconds: number;
+  method: string;
+  note: string | null;
+}
+
+export interface UpView {
+  available: boolean;
+  site_start: number;
+  site_end: number;
+  opening_target: Quantity | null;
+  opening_oligo: Quantity | null;
+  hybridisation: Quantity | null;
+  total: Quantity | null;
+  duplex_structure: string | null;
+  note: string | null;
+}
+
+export interface LibraryTarget {
+  id: number;
+  name: string;
+  sequence: string;
+  length: number;
+  source: string;
+  identifier: string | null;
+  organism: string | null;
+  description: string | null;
+  regions: RegionView[];
+  fetched_at: string | null;
+  updated_at: string;
+}

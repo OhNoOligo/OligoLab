@@ -4,8 +4,8 @@ Lokales Programm zum Rechnen und Visualisieren für modifizierte DNAzyme
 (10-23). Die Projektregeln stehen in [`CLAUDE.md`](CLAUDE.md), die
 Arbeitsschritte in [`PHASEN.md`](PHASEN.md).
 
-**Stand: Phase 3 abgeschlossen** — Massenrechner, Steckbrief, Oberfläche,
-Navigation und die Sequenzkarte.
+**Stand: Phase 4 abgeschlossen** — Massenrechner, Steckbrief, Oberfläche,
+Navigation, Sequenzkarte und die Ziel-RNA.
 
 ---
 
@@ -28,9 +28,9 @@ dann genügt Uvicorn allein.
 Tests:
 
 ```bash
-.venv/bin/python -m pytest          # 249 Fälle
+.venv/bin/python -m pytest          # 309 Fälle
 cd frontend && npm run typecheck
-cd frontend && npm run e2e          # Abnahmetests zu Phase 2 und 3
+cd frontend && npm run e2e          # Abnahmetests zu Phase 2, 3 und 4
 ```
 
 Der Abnahmetest fährt die gebaute Oberfläche gegen das laufende Backend. Er
@@ -57,11 +57,13 @@ Abweichungen gehören in `.env.local`, das nicht versioniert wird.
 | Bauteile erkennen | `app/dnazyme.py` | 5'-Arm, Kern, 3'-Arm über `base_parent` |
 | Faltung | `app/fold.py` | ViennaRNA mit DNA-Parametern |
 | Kritische Stellen | `app/critical.py` | acht Befunde mit Schweregrad |
+| Ziel-RNA holen | `app/target.py` | Text, FASTA, GenBank, drei Datenbanken |
+| Zugänglichkeit | `app/fold_target.py` | RNAplfold-Profil, RNAup-Zerlegung |
 
-Die Oberfläche hat drei gefüllte Seiten: **Steckbrief** (Sequenz, Massen,
-Reiter für Synthese, Beladung, MS und Konzentration, Bibliothek), **Strang**
-(Sequenzkarte, Faltung, Befunde) und **Bausteine** (alle Konstanten ansehen,
-ändern, eigene anlegen).
+Die Oberfläche hat vier gefüllte Seiten: **Ziel** (Zielsequenz,
+Zugänglichkeit, Faltung), **Strang** (Sequenzkarte, Faltung, Befunde),
+**Steckbrief** (Massen, Synthese, Beladung, MS, Konzentration, Bibliothek) und
+**Bausteine** (alle Konstanten ansehen, ändern, eigene anlegen).
 
 Die Sollwerte aus `CLAUDE.md` stehen als pytest-Fälle im Projekt und stimmen:
 alle fünf Massen auf 0,01 Da, die Verbrauchstabelle einschließlich Summe und
@@ -138,6 +140,39 @@ Befund hebt seinen Bereich hervor, Klick auf einen Marker rollt zur Erklärung.
 
 ---
 
+## Was Phase 4 kann
+
+**Vier Wege zum Ziel.** Rohsequenz einfügen, FASTA oder GenBank hochladen,
+oder aus Ensembl, NCBI und RNAcentral holen. Das Format wird erkannt. DNA
+wird stillschweigend zu RNA, Leerraum und Zahlen fallen weg — aber jedes
+andere unbekannte Zeichen ist ein Fehler mit Positionsangabe.
+
+**Ohne Netz bleibt alles bedienbar.** Ein fehlgeschlagener Abruf ist kein
+Fehler, sondern ein Zustand: die Antwort sagt ruhig, dass OligoLab lokal
+rechnet, und greift auf den Zwischenspeicher in `data/targets/` zurück. Die
+Ratenbremsen folgen den Angaben der Anbieter — sie zu überschreiten führt zu
+Sperren, und zwar für den Nutzer.
+
+**Das Zugänglichkeitsprofil** über RNAplfold, je Position die
+Wahrscheinlichkeit, dass ab hier L Nukleotide offen sind. Es ist am
+Fensteranfang verankert: ViennaRNA gibt die Wahrscheinlichkeit für das
+Fenster zurück, das an einer Position *endet* — ohne Umrechnung läge das
+ganze Profil um L−1 Positionen verschoben, und man legte die Sonde an die
+falsche Stelle.
+
+**Kilobasen gehen.** Das Profil rechnet lokal und läuft über jede Länge, in
+überlappenden Stücken mit Fortschrittsmeldung. Die Gesamtfaltung wird ab 3000
+Basen mit Begründung ausgelassen: sie kostet viel Zeit und sagt wenig, weil
+ein Transkript dieser Länge in der Zelle nicht als ein Stück faltet.
+
+**Die Seite „Ziel"** zeigt den Sequenztext mit Lineal, abgesetzten
+Abschnitten und Suchfeld, darunter dieselbe Spurdarstellung wie Phase 3.
+Weil ein Transkript Tausende von Basen hat, gibt es zwei Ebenen: die
+Übersichtsleiste über die ganze Länge und die Detailkarte für den gewählten
+Bereich.
+
+---
+
 ## Was die Gegenrechnung über das Excel sagt
 
 Die unabhängige Rechnung aus der Summenformel weicht bei der Referenzsequenz
@@ -170,6 +205,13 @@ es war und die Oberfläche zeigt beide Zahlen nebeneinander.
 ---
 
 ## Offene Punkte aus Phase 1
+
+**Die Datenbankabrufe sind ungetestet gegen die echten Dienste.** Ensembl,
+NCBI und RNAcentral sind aus der Entwicklungsumgebung nicht erreichbar. Die
+Adressen, Parameter und Ratenbremsen folgen der Dokumentation der Anbieter,
+und das Verhalten ohne Netz ist geprüft — der erfolgreiche Abruf selbst aber
+nur gegen eine nachgebildete Antwort. Wer eine Verbindung hat, sollte ihn
+einmal durchspielen.
 
 **Das GalNAc-Konjugat hat keine Masse.** Sie hängt vollständig am Linker —
 THA-C6 und GalNAc3-1a unterscheiden sich um einige hundert Dalton — und stand
@@ -258,5 +300,5 @@ dort soll aus derselben Quelle kommen wie im Steckbrief.
 
 ## Nächster Schritt
 
-Phase 4 — Die Ziel-RNA (`PHASEN.md`, Abschnitt 4): Zielsequenz eingeben oder
-aus Ensembl, NCBI und RNAcentral holen, falten, Zugänglichkeitsprofil.
+Phase 5 — DNAzym-Entwurf und Bewertung (`PHASEN.md`, Abschnitt 5):
+Spaltstellen finden, Kandidaten bauen und bewerten, MELTING anbinden.

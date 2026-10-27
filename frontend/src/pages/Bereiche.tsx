@@ -12,48 +12,6 @@ function hasOligo(sequence: string | undefined): boolean {
   return Boolean(sequence && sequence.trim());
 }
 
-export function Ziel({ navigate }: { navigate: (path: string) => void }) {
-  const { state, markComputed } = useStore();
-  const target = state.activeTarget;
-  const bereit = hasOligo(target?.sequence);
-
-  return (
-    <div className="flex flex-col gap-4">
-      <AreaPlaceholder
-        area="ziel"
-        title="Ziel"
-        phase={4}
-        what="Zielsequenz holen, falten, Zugänglichkeitsprofil"
-        needs={
-          <ul className="list-inside list-disc">
-            <li>
-              Eine Ziel-RNA. Oben in der Kopfzeile einfügen — oder später aus
-              Ensembl, NCBI und RNAcentral holen.
-            </li>
-            <li>Optional einen Ausschnitt, damit nicht das ganze Transkript gerechnet wird.</li>
-          </ul>
-        }
-      >
-        {!bereit && (
-          <Missing>
-            Es ist keine Ziel-RNA gesetzt. Das Feld dafür steht in der Kopfzeile.
-          </Missing>
-        )}
-      </AreaPlaceholder>
-
-      <Handoff
-        label="Spaltstellen suchen"
-        disabled={!bereit}
-        reason="Erst eine Ziel-RNA setzen"
-        onClick={() => {
-          markComputed("ziel");
-          navigate("/entwurf");
-        }}
-      />
-    </div>
-  );
-}
-
 export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
   const { state, markComputed } = useStore();
   const bereit = hasOligo(state.activeTarget?.sequence);
