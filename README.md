@@ -28,14 +28,18 @@ dann genügt Uvicorn allein.
 Tests:
 
 ```bash
-.venv/bin/python -m pytest          # 313 Fälle
-cd frontend && npm run typecheck
-cd frontend && npm run e2e          # Abnahmetests zu Phase 2, 3 und 4
+.venv/bin/python -m pytest          # 494 Fälle
+cd frontend && npm run typecheck    # tsc -b, nicht `tsc --noEmit`
+cd frontend && npm run e2e          # Abnahmetests zu Phase 2 bis 6
 ```
 
 Der Abnahmetest fährt die gebaute Oberfläche gegen das laufende Backend. Er
 braucht einmalig einen Browser (`npx playwright install chromium`); liegt
 schon einer auf dem Rechner, genügt sein Pfad in `CHROMIUM_PATH`.
+
+`npm run build` prüft die Typen mit (`tsc -b`). Ein bloßes `vite build`
+überspringt das, und `tsc --noEmit` prüft in diesem Projekt **nichts**, weil
+es die Projektverweise übergeht.
 
 `.env` enthält nur Pfade zu externen Programmen (MELTING ab Phase 5, ORCA ab
 Phase 6) und keine Zugangsdaten — OligoLab braucht keine. Maschinenspezifische
