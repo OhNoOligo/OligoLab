@@ -19,7 +19,7 @@ from typing import Any, Literal
 import yaml
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app import (
@@ -37,6 +37,11 @@ from app import (
     target as target_module,
 )
 from app import design as design_module
+from app import geometry as geometry_module
+from app import model3d as model3d_module
+from app import orca as orca_module
+from app import pdb as pdb_module
+from app import report as report_module
 from app import fold_target
 from app import melting as melting_module
 from app import scan as scan_module
@@ -503,6 +508,55 @@ class CompareRequest(BaseModel):
     conditions: ConditionsRequest = Field(default_factory=ConditionsRequest)
 
 
+class StructureFetchRequest(BaseModel):
+    identifier: str
+    prefer: Literal["cif", "pdb"] = "cif"
+
+
+class StructureUploadRequest(BaseModel):
+    name: str
+    text: str
+
+    @field_validator("text")
+    @classmethod
+    def _nicht_leer(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Die Datei ist leer.")
+        return value
+
+
+class ModelRequest(BaseModel):
+    sequence: str
+    structure_id: str
+    core_start: int | None = None
+    core_end: int | None = None
+    #: Rest der Substratkette, hinter dem geschnitten wird.
+    cleavage_residue: int | None = None
+
+
+class MeasureRequest(BaseModel):
+    structure_id: str
+    #: Kette:Rest:Atom, zwei für einen Abstand, drei für einen Winkel.
+    selections: list[str] = Field(min_length=2, max_length=3)
+    #: Auf dem gefädelten Modell messen statt auf der Referenz.
+    pdb: str | None = None
+
+
+class OrcaRequest(BaseModel):
+    structure_id: str
+    residues: list[tuple[str, int]] = Field(min_length=1, max_length=40)
+    purpose: Literal["geometrie", "wechselwirkung", "potential"] = "geometrie"
+    replace_sugar_with_methyl: bool = False
+    processors: int = Field(default=4, ge=1, le=64)
+    pdb: str | None = None
+
+
+class ReportRequest(BaseModel):
+    data: dict[str, Any]
+    #: Überschrift → SVG-Text. Wird vor dem Einbetten entschärft.
+    images: dict[str, str] = Field(default_factory=dict)
+
+
 @app.post("/api/target/read")
 def target_read(request: TargetTextRequest) -> dict[str, Any]:
     """Text als Zielsequenz einlesen.
@@ -834,6 +888,173 @@ def design_patterns() -> dict[str, Any]:
         ],
         "disclaimer": design_module.DISCLAIMER,
     }
+
+
+# -------------------------------------------- Phase 6: Geometrie und 3D
+
+
+@app.get("/api/structures")
+def structures_list() -> dict[str, Any]:
+    """Der Katalog der Referenzstrukturen und was davon schon da ist."""
+    eintraege, voreinstellung = pdb_module.load_references()
+    return {
+        "references": [
+            {**eintrag.as_dict(), "cached": pdb_module.cached_path(eintrag.id) is not None}
+            for eintrag in eintraege
+        ],
+        "default": voreinstellung,
+    }
+
+
+def _structure_or_404(identifier: str) -> tuple[pdb_module.Structure, str]:
+    """Eine Struktur aus dem Ablageort holen — samt ihrem Text."""
+    pfad = pdb_module.cached_path(identifier)
+    if pfad is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Zu `{identifier}` liegt keine Datei vor. Erst holen oder "
+                "eine eigene hochladen."
+            ),
+        )
+    text = pdb_module.read_text(pfad)
+    struktur = pdb_module.parse_structure(text, identifier)
+    struktur.path = pfad
+    return struktur, text
+
+
+@app.post("/api/structures/fetch")
+def structure_fetch(request: StructureFetchRequest) -> dict[str, Any]:
+    """Eine Struktur holen.
+
+    Ein fehlgeschlagener Abruf ist kein HTTP-Fehler: OligoLab bleibt ohne
+    Netz bedienbar, und die Antwort sagt, wie es trotzdem weitergeht
+    (CLAUDE.md, Regel 4).
+    """
+    return pdb_module.fetch(request.identifier, request.prefer).as_dict()
+
+
+@app.post("/api/structures/upload")
+def structure_upload(request: StructureUploadRequest) -> dict[str, Any]:
+    ergebnis = pdb_module.store_upload(request.name, request.text)
+    if not ergebnis.available:
+        raise HTTPException(status_code=422, detail=ergebnis.note or "Unlesbar.")
+    return ergebnis.as_dict()
+
+
+@app.get("/api/structures/{identifier}")
+def structure_read(identifier: str) -> dict[str, Any]:
+    struktur, _ = _structure_or_404(identifier)
+    return struktur.as_dict()
+
+
+@app.get("/api/structures/{identifier}/file", response_class=PlainTextResponse)
+def structure_file(identifier: str) -> str:
+    """Die Datei selbst — 3Dmol.js braucht den Text, nicht die Auswertung."""
+    _, text = _structure_or_404(identifier)
+    return text
+
+
+@app.post("/api/model")
+def model_route(request: ModelRequest) -> dict[str, Any]:
+    """Die Sequenz auf die Referenz fädeln und gleich vermessen.
+
+    Modell und Messung in einer Antwort: beide beziehen sich auf dieselben
+    Koordinaten, und zwei Aufrufe könnten dazwischen auseinanderlaufen.
+    """
+    struktur, text = _structure_or_404(request.structure_id)
+    try:
+        modell = model3d_module.thread(
+            request.sequence,
+            struktur,
+            structure_text=text,
+            core_range=(
+                (request.core_start, request.core_end)
+                if request.core_start and request.core_end
+                else None
+            ),
+            registry=get_registry(),
+        )
+    except notation.NotationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    if not modell.available:
+        return {"model": modell.as_dict(), "geometry": None}
+
+    kern = (
+        (request.core_start, request.core_end)
+        if request.core_start and request.core_end
+        else None
+    )
+    if kern is None:
+        teile = dnazyme.detect_parts(notation.parse(request.sequence, get_registry()))
+        if teile.core_part:
+            kern = (teile.core_part.start, teile.core_part.end)
+
+    atome = pdb_module.atoms_of(modell.pdb)
+    bericht = geometry_module.measure_model(
+        modell, atome, cleavage_residue=request.cleavage_residue, core_range=kern
+    )
+    return {"model": modell.as_dict(), "geometry": bericht.as_dict()}
+
+
+@app.post("/api/measure")
+def measure_route(request: MeasureRequest) -> dict[str, Any]:
+    """Das allgemeine Messwerkzeug (PHASEN.md 6.3)."""
+    if request.pdb:
+        atome = pdb_module.atoms_of(request.pdb)
+    else:
+        _, text = _structure_or_404(request.structure_id)
+        atome = pdb_module.atoms_of(text)
+    try:
+        return geometry_module.measure(atome, request.selections).as_dict()
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/orca/purposes")
+def orca_purposes() -> dict[str, Any]:
+    return {
+        "purposes": [
+            {"id": schluessel, **werte} for schluessel, werte in orca_module.PURPOSES.items()
+        ],
+        "sensible_atom_count": orca_module.SENSIBLE_ATOM_COUNT,
+        "note": (
+            "OligoLab rechnet hier nichts. Diese Dateien sind die Vorbereitung "
+            "— gerechnet wird mit ORCA, auf einem eigenen Rechner."
+        ),
+    }
+
+
+@app.post("/api/orca")
+def orca_route(request: OrcaRequest) -> dict[str, Any]:
+    """Ein Fragment herausschneiden und die Eingabedatei schreiben."""
+    if request.pdb:
+        atome = pdb_module.atoms_of(request.pdb)
+    else:
+        _, text = _structure_or_404(request.structure_id)
+        atome = pdb_module.atoms_of(text)
+
+    fragment = orca_module.cut(
+        atome,
+        [(kette, nummer) for kette, nummer in request.residues],
+        replace_sugar_with_methyl=request.replace_sugar_with_methyl,
+    )
+    if fragment.atom_count == 0:
+        raise HTTPException(status_code=422, detail=fragment.note or "Leeres Fragment.")
+    return {
+        "fragment": fragment.as_dict(),
+        "input": orca_module.write_input(
+            fragment, request.purpose, processors=request.processors
+        ),
+        "purpose": orca_module.PURPOSES[request.purpose],
+    }
+
+
+@app.post("/api/report", response_class=HTMLResponse)
+def report_route(request: ReportRequest) -> str:
+    """Der Gesamtbericht als eigenständige HTML-Seite (PHASEN.md 6.6)."""
+    return report_module.candidate_report(request.data, request.images)
 
 
 @app.get("/api/library/targets")

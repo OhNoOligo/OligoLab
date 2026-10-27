@@ -80,6 +80,8 @@ export interface SequenceMapProps {
   /** Hervorgehobener Bereich, etwa aus der Befundliste angeklickt. */
   highlight?: MapSelection | null;
   onPickFinding?: (finding: FindingView) => void;
+  /** Klick auf eine Position — die Kopplung mit der 3D-Ansicht (PHASEN.md 6.4). */
+  onPickPosition?: (position: number) => void;
   /** Für den Export: wird auf das <svg> gelegt. */
   svgId?: string;
   title?: string;
@@ -103,6 +105,7 @@ export function SequenceMap({
   cell = DEFAULT_CELL,
   highlight = null,
   onPickFinding,
+  onPickPosition,
   svgId,
   title,
 }: SequenceMapProps) {
@@ -270,7 +273,13 @@ export function SequenceMap({
           const text =
             monomer.code.length === 1 ? monomer.code : monomer.code.slice(0, 1);
           return (
-            <g key={monomer.position}>
+            <g
+              key={monomer.position}
+              onClick={
+                onPickPosition ? () => onPickPosition(monomer.position) : undefined
+              }
+              style={onPickPosition ? { cursor: "pointer" } : undefined}
+            >
               <rect
                 x={x(monomer.position) + 0.5}
                 y={tops.bases}

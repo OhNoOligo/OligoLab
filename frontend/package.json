@@ -8,13 +8,15 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "e2e": "node e2e/phase2.mjs && node e2e/phase3.mjs && node e2e/phase4.mjs && node e2e/phase5.mjs",
+    "e2e": "node e2e/phase2.mjs && node e2e/phase3.mjs && node e2e/phase4.mjs && node e2e/phase5.mjs && node e2e/phase6.mjs",
     "e2e:phase2": "node e2e/phase2.mjs",
     "e2e:phase3": "node e2e/phase3.mjs",
     "e2e:phase4": "node e2e/phase4.mjs",
-    "e2e:phase5": "node e2e/phase5.mjs"
+    "e2e:phase5": "node e2e/phase5.mjs",
+    "e2e:phase6": "node e2e/phase6.mjs"
   },
   "dependencies": {
+    "3dmol": "^2.5.5",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
@@ -24,9 +26,9 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.4",
+    "playwright": "1.49.1",
     "tailwindcss": "^4.1.18",
     "typescript": "5.6.3",
-    "vite": "6.0.7",
-    "playwright": "1.49.1"
+    "vite": "6.0.7"
   }
 }

@@ -18,7 +18,12 @@
  */
 
 import { useMemo, useRef } from "react";
-import type { CandidateView, LinkageView, MonomerView } from "../types";
+import type {
+  CandidateView,
+  ConjugateView,
+  LinkageView,
+  MonomerView,
+} from "../types";
 import { KLASSE_COLOR } from "./SequenceEditor";
 import { exportSvg, safeFilename } from "../lib/svgExport";
 
@@ -78,7 +83,7 @@ export function PairingMap({
   /** Aus `/api/strand` — ohne sie wird in Grau gezeichnet. */
   monomers?: MonomerView[];
   linkages?: LinkageView[];
-  conjugates?: { name: string; end: string }[];
+  conjugates?: ConjugateView[];
   name?: string;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -127,25 +132,24 @@ export function PairingMap({
     const arms: Placed[] = [];
     const core: { monomer: MonomerView; x: number; y: number }[] = [];
 
+    /* Jeder Zugriff auf die Liste wird abgesichert. Stimmen Sequenz und
+     * Monomerliste einmal nicht überein, soll das Bild eine Zelle weniger
+     * haben — und nicht die ganze Seite abstürzen. */
+    const at = (index: number): MonomerView | null => list[index] ?? null;
+
     // 5'-Arm: Monomer k paart stromab[n5 - k] (0-basiert).
     for (let k = 1; k <= n5; k += 1) {
       const targetIndex = cut + (n5 - k);
-      arms.push({
-        monomer: list[k - 1],
-        x: x(targetIndex),
-        y: Y_STRAND,
-        targetIndex,
-      });
+      const monomer = at(k - 1);
+      if (!monomer) continue;
+      arms.push({ monomer, x: x(targetIndex), y: Y_STRAND, targetIndex });
     }
     // 3'-Arm: Monomer k paart stromauf[n3 - k].
     for (let k = 1; k <= n3; k += 1) {
       const targetIndex = n3 - k;
-      arms.push({
-        monomer: list[n5 + nc + k - 1],
-        x: x(targetIndex),
-        y: Y_STRAND,
-        targetIndex,
-      });
+      const monomer = at(n5 + nc + k - 1);
+      if (!monomer) continue;
+      arms.push({ monomer, x: x(targetIndex), y: Y_STRAND, targetIndex });
     }
 
     // Der Kern als Schleife über der Schnittstelle. Die Position 1 des Kerns
@@ -159,8 +163,10 @@ export function PairingMap({
       FROM + (nc <= 1 ? SWEEP / 2 : (index * SWEEP) / (nc - 1));
     for (let j = 0; j < nc; j += 1) {
       const rad = (angleOf(j) * Math.PI) / 180;
+      const monomer = at(n5 + j);
+      if (!monomer) continue;
       core.push({
-        monomer: list[n5 + j],
+        monomer,
         x: cx + radius * Math.cos(rad),
         y: cy + radius * Math.sin(rad),
       });
@@ -208,7 +214,7 @@ export function PairingMap({
   const mismatches = layout.arms.filter(
     (placed) =>
       placed.targetIndex !== null &&
-      bond(letterOf(placed.monomer), target[placed.targetIndex]) === "none",
+      bond(letterOf(placed.monomer), target[placed.targetIndex] ?? "") === "none",
   );
 
   return (
@@ -319,7 +325,7 @@ export function PairingMap({
             if (placed.targetIndex === null) return null;
             const art = bond(
               letterOf(placed.monomer),
-              target[placed.targetIndex],
+              target[placed.targetIndex] ?? "",
             );
             if (art === "none") {
               return (
@@ -445,7 +451,12 @@ export function PairingMap({
 
       {conjugates && conjugates.length > 0 && (
         <p className="mt-2 text-xs" style={{ color: "var(--mod-konjugat)" }}>
-          {conjugates.map((c) => `${c.name} am ${c.end}-Ende`).join(" · ")}
+          {conjugates
+            .map(
+              (c) =>
+                `${c.name} am ${c.attach === "5prime" ? "5'" : c.attach === "3prime" ? "3'" : "internen"}-Ende`,
+            )
+            .join(" · ")}
         </p>
       )}
       {mismatches.length > 0 && (

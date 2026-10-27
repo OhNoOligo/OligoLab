@@ -527,3 +527,73 @@ entries:
     short: >
       Nach dem Schnitt müssen die Hälften abfallen, sonst schneidet der Strang
       nur einmal. Binden die Arme zu fest, steht Umsatz gegen Bindung.
+
+  # --------------------------------------- Phase 6: Geometrie und 3D
+  field.model3d:
+    title: "3D-Modell"
+    short: >
+      Ordnet räumlich ein, wo die Modifikationen sitzen: wie weit von der
+      Spaltstelle, wie weit vom Kern, wie nah an einem Ion.
+  field.reference:
+    title: "Referenzstruktur"
+    short: >
+      Die Koordinaten kommen aus einer gemessenen Struktur. Ohne Netz lässt
+      sich eine Datei auch von Hand einlegen — OligoLab bleibt bedienbar.
+    long: >
+      Methode, Auflösung und Literatur werden aus der Datei gelesen, nicht
+      von Hand eingetragen. Welche Kette das DNAzym ist und welche das
+      Substrat, entscheidet die Art der Reste: DA/DC/DG/DT heißt DNA,
+      A/C/G/U heißt RNA. Der Buchstabe der Kette spielt keine Rolle.
+  field.cleavage_residue:
+    title: "Spaltstelle im Substrat"
+    short: >
+      Die Restnummer in der Substratkette, hinter der geschnitten wird. Der
+      In-line-Winkel wird an genau dieser Stelle gemessen.
+  result.viewer3d:
+    title: "Die 3D-Ansicht"
+    short: >
+      Rückgrat als Cartoon, ausgewählte Reste als Stäbchen. Die Einfärbung
+      nach Modifikation benutzt dieselben Farben wie die Sequenzkarte.
+    long: >
+      Jede Position trägt mit, woher ihre Koordinaten stammen: aus der
+      Referenz übernommen, als Ringgerüst beim Austausch Purin gegen Purin,
+      nur Zucker und Phosphat beim Austausch Purin gegen Pyrimidin, oder
+      ideal — das heißt außerhalb der Referenz und ohne gemessene
+      Koordinaten. Eine Base wird nie geraten.
+  result.geometry:
+    title: "Geometrie"
+    short: >
+      Der In-line-Winkel an der Spaltstelle und die Abstände jeder
+      Modifikation zur Spaltstelle, zum Kern und zu Ionen.
+  method.inline_angle:
+    title: "In-line-Winkel"
+    short: >
+      Der Winkel 2'-O ··· P ··· O5'. Das 2'-OH greift das Phosphat an, das
+      O5' ist die Abgangsgruppe. Nahe 180 Grad kann die Umesterung ablaufen,
+      quer dazu nicht.
+    long: >
+      Ohne 2'-OH gibt es keinen In-line-Angriff — darum liefert ein DNA-Rest
+      hier keine Zahl, sondern die Begründung. Gemessen wird an den
+      Koordinaten der Referenz; eine Position außerhalb davon hat keine.
+  field.measure:
+    title: "Messwerkzeug"
+    short: >
+      Abstand zwischen zwei, Winkel zwischen drei Atomen. Geschrieben als
+      Kette:Rest:Atom, zum Beispiel `B:9:P`, mit Komma getrennt.
+  field.orca:
+    title: "Quantenchemie vorbereiten"
+    short: >
+      Schneidet ein Fragment heraus, sättigt die abgeschnittenen Bindungen
+      mit Wasserstoff ab und schreibt die ORCA-Eingabedatei. Gerechnet wird
+      hier nichts.
+  field.orca_purpose:
+    title: "Zweck der Rechnung"
+    short: >
+      Geometrieoptimierung mit r2SCAN-3c, Wechselwirkungsenergie mit
+      DLPNO-CCSD(T) und Counterpoise-Korrektur, oder das elektrostatische
+      Potential.
+  field.report:
+    title: "Gesamtbericht"
+    short: >
+      Fasst alles zum aktiven Strang auf einem Blatt zusammen, mit Datum und
+      allen Einstellungen im Fuß. Das PDF schreibt der Druckdialog.

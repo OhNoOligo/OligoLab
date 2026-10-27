@@ -1,0 +1,27 @@
+# OligoLab — Referenzstrukturen (PHASEN.md 6.1)
+#
+# Nur Kennung, Rolle und ein kurzer Vermerk stehen hier. Methode, Aufloesung
+# und Literatur werden NICHT von Hand eingetragen, sondern beim Laden aus der
+# Strukturdatei selbst gelesen: eine mmCIF-Datei fuehrt sie mit, und ein von
+# Hand abgeschriebener Wert waere bloss eine zweite, schlechtere Quelle.
+#
+# Die Zuordnung der Ketten steht aus demselben Grund nicht hier. Sie wird
+# beim Laden bestimmt: welche Kette DNA ist und welche RNA, sagt die Datei.
+
+version: 1
+
+default: "8E9A"
+
+references:
+  - id: "8E9A"
+    title: "10-23-DNAzym mit RNA-Substrat"
+    role: "dnazyme_rna"
+    note: >
+      Voreinstellung fuer das 10-23 (PHASEN.md 6.1). Der katalytische Kern
+      und das gebundene Substrat sind enthalten.
+  - id: "1BNA"
+    title: "B-DNA-Dodekamer (Drew-Dickerson)"
+    role: "dna_duplex"
+    note: >
+      Klassische B-DNA. Dient als Gegenprobe fuer die Geometriemessung:
+      wer hier einen In-line-Winkel nahe 180 Grad misst, misst falsch.

@@ -792,3 +792,182 @@ def test_schlechte_junktionen_auch_ueber_die_einstellungen(client):
     ).json()
     assert daten["settings"]["include_poor_junctions"] is True
     assert daten["scan"]["hidden_poor"] == 0
+
+
+# ================================================ Phase 6: Geometrie und 3D
+
+from tests.structures import build_pdb  # noqa: E402
+
+KERN = "GGCTAGCTACAACGA"
+REFERENZ_DNA = "TTGGGGTAA" + KERN + "GGTGCATGT"
+REFERENZ_RNA = "ACGUACGUACGUACGUAC"
+
+
+@pytest.fixture
+def referenz(client) -> str:
+    """Eine Struktur mit bekannter Geometrie in den Ablageort legen."""
+    text = build_pdb(
+        REFERENZ_DNA, REFERENZ_RNA,
+        inline_residue=9, inline_angle_deg=168.0,
+        ions=[("MG", 1.4, 0.0, 0.3)],
+    )
+    antwort = client.post("/api/structures/upload", json={"name": "TESTREF", "text": text})
+    assert antwort.status_code == 200
+    return "TESTREF"
+
+
+def test_katalog_der_strukturen(client):
+    daten = client.get("/api/structures").json()
+    assert daten["default"] == "8E9A"
+    assert any(r["id"] == "8E9A" for r in daten["references"])
+    assert all("cached" in r for r in daten["references"])
+
+
+def test_abruf_ohne_netz_ist_kein_fehler(client):
+    """CLAUDE.md, Regel 4."""
+    antwort = client.post("/api/structures/fetch", json={"identifier": "9ZZZ"})
+    assert antwort.status_code == 200
+    daten = antwort.json()
+    assert daten["available"] is False
+    assert "von Hand" in daten["note"]
+
+
+def test_eigene_datei_hochladen(client, referenz):
+    daten = client.get(f"/api/structures/{referenz}").json()
+    rollen = {c["role"]: c["id"] for c in daten["chains"] if c["role"]}
+    assert rollen == {"dnazyme": "A", "substrate": "B"}
+    assert daten["resolution_a"] == pytest.approx(1.8)
+
+
+def test_leere_datei_wird_abgewiesen(client):
+    antwort = client.post("/api/structures/upload", json={"name": "X", "text": "   "})
+    assert antwort.status_code == 422
+
+
+def test_die_datei_selbst_gibt_es_auch(client, referenz):
+    """3Dmol.js braucht den Text, nicht die Auswertung."""
+    antwort = client.get(f"/api/structures/{referenz}/file")
+    assert antwort.status_code == 200
+    assert antwort.text.startswith("TITLE")
+
+
+def test_unbekannte_struktur(client):
+    assert client.get("/api/structures/9ZZZ").status_code == 404
+
+
+def test_modell_und_messung_in_einer_antwort(client, referenz):
+    antwort = client.post(
+        "/api/model",
+        json={
+            "sequence": "[LNA-T]TGGGGTAA" + KERN + "GGTGCATGT",
+            "structure_id": referenz,
+            "cleavage_residue": 9,
+        },
+    )
+    assert antwort.status_code == 200
+    daten = antwort.json()
+    modell = daten["model"]
+    assert modell["available"] is True
+    assert modell["pdb"].startswith("ATOM")
+    assert "Das ist ein Modell" in modell["disclaimer"]
+    assert modell["positions"][0]["modification"] == "LNA"
+
+    winkel = daten["geometry"]["inline"]
+    assert winkel["angle"]["value"] == pytest.approx(168.0, abs=0.1)
+    assert winkel["rating"] == "good"
+
+
+def test_jede_position_sagt_woher_ihre_koordinaten_stammen(client, referenz):
+    """CLAUDE.md, Regel 3 — auch für Koordinaten."""
+    antwort = client.post(
+        "/api/model",
+        json={"sequence": "AAA" + REFERENZ_DNA, "structure_id": referenz},
+    )
+    positionen = antwort.json()["model"]["positions"]
+    assert {p["provenance"] for p in positionen} == {"ideal", "uebernommen"}
+    assert all(p["reliability"] for p in positionen)
+    ideal = [p for p in positionen if p["provenance"] == "ideal"]
+    assert len(ideal) == 3
+    assert "nicht aus der Referenz" in ideal[0]["provenance_label"]
+
+
+def test_modell_mit_kaputter_sequenz(client, referenz):
+    antwort = client.post(
+        "/api/model", json={"sequence": "ACGX", "structure_id": referenz}
+    )
+    assert antwort.status_code == 422
+
+
+def test_messwerkzeug_ueber_die_schnittstelle(client, referenz):
+    antwort = client.post(
+        "/api/measure",
+        json={"structure_id": referenz, "selections": ["B:9:O2'", "B:10:P"]},
+    )
+    daten = antwort.json()
+    assert daten["kind"] == "abstand"
+    assert daten["value"] == pytest.approx(3.2, abs=0.01)
+
+
+def test_messwerkzeug_braucht_eine_brauchbare_angabe(client, referenz):
+    antwort = client.post(
+        "/api/measure", json={"structure_id": referenz, "selections": ["A-1-P", "B:9:P"]}
+    )
+    assert antwort.status_code == 422
+
+
+def test_orca_zwecke(client):
+    daten = client.get("/api/orca/purposes").json()
+    assert {p["id"] for p in daten["purposes"]} == {
+        "geometrie", "wechselwirkung", "potential"
+    }
+    assert "rechnet hier nichts" in daten["note"]
+
+
+def test_orca_eingabe_wird_geschrieben(client, referenz):
+    antwort = client.post(
+        "/api/orca",
+        json={
+            "structure_id": referenz,
+            "residues": [["B", 9], ["B", 10]],
+            "purpose": "wechselwirkung",
+        },
+    )
+    daten = antwort.json()
+    assert "DLPNO-CCSD(T)" in daten["input"]
+    assert "Counterpoise" in daten["purpose"]["note"]
+    assert daten["fragment"]["atom_count"] > 0
+    assert "nichts gerechnet" in daten["input"]
+
+
+def test_orca_mit_leerer_auswahl(client, referenz):
+    antwort = client.post(
+        "/api/orca", json={"structure_id": referenz, "residues": [["Z", 1]]}
+    )
+    assert antwort.status_code == 422
+
+
+def test_bericht_kommt_als_html(client):
+    antwort = client.post(
+        "/api/report",
+        json={
+            "data": {"name": "Test", "sequence": "TTGG", "length": 4,
+                     "settings": {"Na": "50 mM"}},
+            "images": {"Sequenzkarte": "<svg><text>Bild</text></svg>"},
+        },
+    )
+    assert antwort.status_code == 200
+    assert "text/html" in antwort.headers["content-type"]
+    assert "<text>Bild</text>" in antwort.text
+    assert "Na: 50 mM" in antwort.text
+
+
+def test_skript_im_mitgeschickten_bild_landet_nicht_im_bericht(client):
+    antwort = client.post(
+        "/api/report",
+        json={
+            "data": {"name": "Test"},
+            "images": {"Karte": "<svg><script>alert(1)</script><text>ok</text></svg>"},
+        },
+    )
+    assert "<script>alert(1)</script>" not in antwort.text
+    assert "<text>ok</text>" in antwort.text

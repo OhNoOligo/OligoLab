@@ -4,8 +4,8 @@ Lokales Programm zum Rechnen und Visualisieren für modifizierte DNAzyme
 (10-23). Die Projektregeln stehen in [`CLAUDE.md`](CLAUDE.md), die
 Arbeitsschritte in [`PHASEN.md`](PHASEN.md).
 
-**Stand: Phase 5 abgeschlossen** — Massenrechner, Steckbrief, Oberfläche,
-Navigation, Sequenzkarte, die Ziel-RNA und der DNAzym-Entwurf.
+**Stand: alle sechs Phasen abgeschlossen** — Massenrechner, Steckbrief,
+Oberfläche, Sequenzkarte, Ziel-RNA, DNAzym-Entwurf, Geometrie und 3D.
 
 ---
 
@@ -223,6 +223,56 @@ ausdrücklich: *das Modell sieht es nicht*.
 
 ---
 
+## Was Phase 6 kann
+
+**Referenzstrukturen** aus `data/structures/`, von der RCSB-PDB oder als
+eigene Datei. Methode, Auflösung und Literatur werden aus der Datei gelesen,
+nicht von Hand in den Katalog geschrieben: ein abgeschriebener Wert wäre eine
+zweite Quelle, die beim ersten Tippfehler von der ersten abweicht. Welche
+Kette das DNAzym ist und welche das Substrat, entscheidet die Art der Reste —
+nicht der Buchstabe der Kette.
+
+**Das Modell** entsteht, indem die Sequenz auf die Referenz gefädelt wird:
+gleiche Position, gleiche Rückgratkoordinaten, ausgetauschte Base. Ausgerichtet
+wird am katalytischen Kern, dem einzigen Anker, der nicht geraten ist.
+
+**Jede Position trägt mit, woher ihre Koordinaten stammen** — genau wie jede
+Zahl im übrigen Programm:
+
+| Kennzeichen | Bedeutung |
+| --- | --- |
+| aus der Referenz | Base gleich, alle Atome übernommen |
+| Ringgerüst | Purin gegen Purin: das gemeinsame Gerüst bleibt, die unterschiedlichen Substituenten fallen weg |
+| nur Zucker | Purin gegen Pyrimidin: nur Zucker und Phosphat. Die Base wird **nicht geraten** |
+| ideal | außerhalb der Referenz, ohne gemessene Koordinaten |
+
+Ein hingeschobenes Ringatom sieht im Bild genauso aus wie ein gemessenes —
+das ist der Grund, es zu lassen.
+
+**Der In-line-Winkel** 2'-O ··· P ··· O5' an der Spaltstelle, mit beiden
+Abständen und einer Ampel. Auf einem DNA-Rest gibt es keine Zahl, sondern den
+Grund: ohne 2'-OH gibt es keinen In-line-Angriff. Dazu der Abstand jeder
+modifizierten Position zur Spaltstelle, zum Kern (in Å **und** in Nukleotiden)
+und zu Metallionen — unter 6 Å ist das ein Warnsignal.
+
+**Die 3D-Ansicht** mit 3Dmol.js: Cartoon für das Rückgrat, Stäbchen für
+Ausgewähltes, Einfärbung nach Kette, Bauteil oder Modifikationstyp — mit
+denselben Farben wie die Sequenzkarte. Die Spaltstelle ist immer markiert und
+beschriftet. Sequenzkarte und 3D-Fenster teilen sich eine Auswahl: ein Klick
+in der Karte hebt die Position im Modell hervor und umgekehrt.
+
+**ORCA-Vorbereitung** (freiwillig): Fragment schneiden, abgeschnittene
+Bindungen mit Wasserstoff absättigen, Eingabedatei schreiben — für
+Geometrieoptimierung, Wechselwirkungsenergie oder elektrostatisches Potential.
+**Gerechnet wird hier nichts.** Quantenchemie läuft nicht nebenbei im
+Hintergrund einer Oberfläche.
+
+**Der Gesamtbericht** fasst alles auf einem Blatt zusammen, mit Datum und allen
+Einstellungen im Fuß. Er rechnet nichts nach — eine zweite Rechnung könnte von
+der Anzeige abweichen, und dann glaubte man der falschen.
+
+---
+
 ## Was die Gegenrechnung über das Excel sagt
 
 Die unabhängige Rechnung aus der Summenformel weicht bei der Referenzsequenz
@@ -287,11 +337,26 @@ Gegenrechnung meldet diese Bausteine als unvollständig.
 
 Jede einzeln begründet, damit sie bei Bedarf zurückgedreht werden kann.
 
-**Drei Module mehr als in der Verzeichnisstruktur.** `app/config.py`
-(Einstellungen), `app/registry.py` (YAML-Kataloge) und `app/library.py`
-(SQLite). Ohne sie läge das Laden der Datendateien in jedem Rechenmodul
+**Fünf Module mehr als in der Verzeichnisstruktur.** `app/config.py`
+(Einstellungen), `app/registry.py` (YAML-Kataloge), `app/library.py`
+(SQLite), `app/orca.py` (die freiwillige Brücke aus 6.5) und `app/report.py`
+(der Gesamtbericht aus 6.6). Die beiden letzten haben in `CLAUDE.md` keinen
+Platz, weil die Verzeichnisstruktur dort vor Phase 6 geschrieben wurde; sie
+gehören zu Abschnitten, die es dort gibt. Ohne sie läge das Laden der Datendateien in jedem Rechenmodul
 einzeln. Die in `CLAUDE.md` genannten Dateien gibt es alle und sie tun, was
 dort steht.
+
+**Das PDF schreibt der Browser.** `PHASEN.md` 6.6 verlangt HTML und PDF.
+Erzeugt wird HTML mit einem Druckstil, das PDF entsteht im Druckdialog. Eine
+PDF-Bibliothek hätte Systembibliotheken nachgezogen (Cairo, Pango), die sich
+ohne Netz nicht nachinstallieren lassen — für dasselbe Blatt.
+
+**Die ideale Helix ist nur eine Rückgratspur.** `PHASEN.md` 6.2 will
+Längenunterschiede als ideale Hybridhelix verlängern. Erzeugt werden dafür
+Phosphorlagen, keine vollständigen Nukleotide: eine ganze Nukleotidgeometrie
+aus Standardwerten zusammenzusetzen hieße, Atomlagen zu erfinden, die
+hinterher wie gemessene aussehen. Positionen außerhalb der Referenz werden
+darum als `ideal` gekennzeichnet und nicht im Modell dargestellt.
 
 **Zwei Datendateien mehr.** `data/extinction.yaml` hält die
 Nearest-Neighbor-Tabellen; die stehen nicht im Excel und sind deshalb
@@ -348,12 +413,29 @@ dort soll aus derselben Quelle kommen wie im Steckbrief.
 
 ---
 
-## Nächster Schritt
+## Was ungeprüft bleibt
 
-Phase 6 — Geometrie und 3D (`PHASEN.md`, Abschnitt 6): Referenzstrukturen,
-3D-Modell, Winkel und Abstände.
+Drei Wege gehen nach außen und ließen sich in dieser Umgebung nicht bis zum
+Ende prüfen. Sie sind alle freiwillig — ohne sie bleibt OligoLab voll
+bedienbar.
 
-Noch ungeprüft an Phase 5: die Ausgabe von MELTING 5 wird gegen eine
-nachgebildete Antwort gelesen, nicht gegen das echte Programm — es ist in
-dieser Umgebung nicht installiert. Der Aufruf selbst (voller Pfad,
-`shell=False`, Rückgabecode) ist getestet.
+**Die Sequenzabrufe** (Ensembl, NCBI, RNAcentral) sind von hier nicht
+erreichbar. Geprüft ist der Weg mit einer nachgebildeten Antwort, der
+Zwischenspeicher und das Verhalten ohne Netz.
+
+**MELTING 5** ist nicht installiert. Geprüft ist der Aufruf — voller Pfad,
+`shell=False`, Rückgabecode — und das Lesen einer nachgebildeten Ausgabe,
+nicht die Ausgabe des echten Programms.
+
+**Die RCSB-PDB** ist von hier nicht erreichbar, also auch nicht `8E9A`. Der
+Abnahmetest der Phase 6 läuft deshalb auf `frontend/e2e/fixtures/TESTREF.pdb`:
+einer Struktur mit **bekannter** Geometrie. Für ein Messgerät ist das sogar
+der bessere Prüfstein — bei `8E9A` müsste die richtige Antwort erst wieder
+gemessen werden. Mit Netz:
+
+```
+# In der Oberfläche: Bereich 3D → Struktur „8E9A" → „holen"
+curl -o data/structures/8E9A.cif https://files.rcsb.org/download/8E9A.cif
+```
+
+Liegt die Datei im Ablageort, läuft alles Weitere ohne Netz.

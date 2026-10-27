@@ -12,8 +12,8 @@ import { HelpProvider } from "./components/HelpTip";
 import { AREAS, Sidebar } from "./components/Sidebar";
 import { Notice } from "./components/ui";
 import { Bausteine } from "./pages/Bausteine";
-import { Modell3D } from "./pages/Bereiche";
 import { Entwurf } from "./pages/Entwurf";
+import { Modell3D } from "./pages/Modell3D";
 import { Ziel } from "./pages/Ziel";
 import { Strang } from "./pages/Strang";
 import { Hilfe } from "./pages/Hilfe";
@@ -39,7 +39,7 @@ function Inhalt({
     case "/strang":
       return <Strang navigate={navigate} />;
     case "/3d":
-      return <Modell3D />;
+      return <Modell3D navigate={navigate} />;
     case "/bausteine":
       return <Bausteine />;
     case "/hilfe":

@@ -585,3 +585,133 @@ export interface ModifyResultView {
   before?: SnapshotView;
   after?: SnapshotView;
 }
+
+/* ------------------------------------------- Phase 6: Geometrie und 3D */
+
+export interface ReferenceSpecView {
+  id: string;
+  title: string;
+  role: string;
+  note: string | null;
+  cached: boolean;
+}
+
+export interface ChainView {
+  id: string;
+  kind: "dna" | "rna" | "protein" | "ion" | "wasser" | "anderes";
+  length: number;
+  sequence: string;
+  first: number | null;
+  last: number | null;
+  role: string | null;
+}
+
+export interface StructureView {
+  id: string;
+  path: string | null;
+  format: string;
+  title: string | null;
+  method: string | null;
+  resolution_a: number | null;
+  citation: string | null;
+  chains: ChainView[];
+  ions: {
+    residue: string;
+    chain: string;
+    number: number;
+    element: string;
+    xyz: number[];
+  }[];
+  available: boolean;
+  source: string;
+  note: string | null;
+}
+
+export type Provenance = "uebernommen" | "geruest" | "nur_zucker" | "ideal";
+
+export interface ModelPositionView {
+  position: number;
+  code: string;
+  base: string;
+  residue_number: number;
+  chain: string;
+  provenance: Provenance;
+  provenance_label: string;
+  reliability: string;
+  modification: string | null;
+  klasse: string;
+  note: string | null;
+}
+
+export interface ModelView {
+  available: boolean;
+  pdb: string;
+  reference_id: string | null;
+  positions: ModelPositionView[];
+  substrate: ModelPositionView[];
+  chain_dnazyme: string;
+  chain_substrate: string;
+  cleavage_residue: number | null;
+  counts: Record<string, number>;
+  disclaimer: string;
+  warnings: string[];
+  note: string | null;
+}
+
+export interface InlineAngleView {
+  available: boolean;
+  angle: Quantity | null;
+  distance_attack: Quantity | null;
+  distance_leaving: Quantity | null;
+  atoms: string[];
+  assessment: string | null;
+  rating: "good" | "warn" | "bad" | null;
+  note: string | null;
+}
+
+export interface PositionDistanceView {
+  position: number;
+  code: string;
+  modification: string | null;
+  nucleotides: number | null;
+  angstrom: number | null;
+  note: string | null;
+}
+
+export interface GeometryView {
+  available: boolean;
+  inline: InlineAngleView;
+  to_cleavage: PositionDistanceView[];
+  to_core: PositionDistanceView[];
+  ion_contacts: Record<
+    string,
+    { residue: string; element: string; chain: string; number: number; angstrom: number }[]
+  >;
+  warnings: string[];
+  note: string | null;
+}
+
+export interface MeasurementView {
+  kind: string;
+  atoms: string[];
+  value: number | null;
+  unit: string;
+  note: string | null;
+}
+
+export interface FragmentView {
+  atom_count: number;
+  added_hydrogens: number;
+  residues: string[];
+  charge: number;
+  multiplicity: number;
+  sensible: boolean;
+  size_hint: string;
+  note: string | null;
+}
+
+export interface OrcaView {
+  fragment: FragmentView;
+  input: string;
+  purpose: { label: string; keywords: string; note: string };
+}

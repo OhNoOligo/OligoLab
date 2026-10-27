@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     ensembl_url: str = "https://rest.ensembl.org"
     ncbi_url: str = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
     rnacentral_url: str = "https://rnacentral.org/api/v1"
+    # Strukturen von der RCSB-PDB (PHASEN.md 6.1). Ebenfalls freiwillig:
+    # eine Datei laesst sich auch von Hand einlegen.
+    rcsb_url: str = "https://files.rcsb.org/download"
     network_timeout_s: float = 15.0
 
     # NCBI bittet darum, bei Abrufen eine Kennmail mitzuschicken, um bei
@@ -50,6 +53,14 @@ class Settings(BaseSettings):
     # mitgeschickt. Die Adresse wird nicht erraten — wer sie mitschicken
     # will, traegt sie in die `.env` ein.
     ncbi_email: str = ""
+
+    @property
+    def structures_dir(self) -> Path:
+        return self.data_dir / "structures"
+
+    @property
+    def references_path(self) -> Path:
+        return self.data_dir / "references.yaml"
 
     @property
     def monomers_path(self) -> Path:

@@ -8,7 +8,6 @@
 import type {
   AccessibilityView,
   ConsumptionTable,
-  CandidateView,
   CoreSpecView,
   DesignView,
   FetchResultView,
@@ -22,7 +21,13 @@ import type {
   LoadingRecipe,
   ModificationSpecView,
   MonomerCatalog,
+  GeometryView,
+  MeasurementView,
+  ModelView,
   ModifyResultView,
+  OrcaView,
+  ReferenceSpecView,
+  StructureView,
   NotationProblem,
   OdConversion,
   Profile,
@@ -286,6 +291,68 @@ export const api = {
     request<{ patterns: { id: string; label: string }[]; disclaimer: string }>(
       "/api/design/patterns",
     ),
+
+  /* --------------------------------- Phase 6: Geometrie und 3D */
+
+  structures: () =>
+    request<{ references: ReferenceSpecView[]; default: string | null }>(
+      "/api/structures",
+    ),
+
+  structureFetch: (identifier: string, prefer: "cif" | "pdb" = "cif") =>
+    post<StructureView>("/api/structures/fetch", { identifier, prefer }),
+
+  structureUpload: (name: string, text: string) =>
+    post<StructureView>("/api/structures/upload", { name, text }),
+
+  structure: (identifier: string) =>
+    request<StructureView>(`/api/structures/${encodeURIComponent(identifier)}`),
+
+  model: (body: {
+    sequence: string;
+    structure_id: string;
+    core_start?: number | null;
+    core_end?: number | null;
+    cleavage_residue?: number | null;
+  }) =>
+    post<{ model: ModelView; geometry: GeometryView | null }>("/api/model", body),
+
+  measure: (body: {
+    structure_id: string;
+    selections: string[];
+    pdb?: string | null;
+  }) => post<MeasurementView>("/api/measure", body),
+
+  orcaPurposes: () =>
+    request<{
+      purposes: { id: string; label: string; keywords: string; note: string }[];
+      sensible_atom_count: number;
+      note: string;
+    }>("/api/orca/purposes"),
+
+  orca: (body: {
+    structure_id: string;
+    residues: [string, number][];
+    purpose: string;
+    replace_sugar_with_methyl?: boolean;
+    pdb?: string | null;
+  }) => post<OrcaView>("/api/orca", body),
+
+  /** Der Gesamtbericht kommt als HTML-Text, nicht als JSON. */
+  report: async (
+    data: Record<string, unknown>,
+    images: Record<string, string>,
+  ): Promise<string> => {
+    const response = await fetch("/api/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data, images }),
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, null, "Der Bericht ist fehlgeschlagen.");
+    }
+    return response.text();
+  },
 
   monomers: () => request<MonomerCatalog>("/api/monomers"),
 

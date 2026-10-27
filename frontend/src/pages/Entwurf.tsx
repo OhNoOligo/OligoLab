@@ -158,7 +158,7 @@ function Profile({
     );
     let best: number | null = null;
     for (let index = from; index < to; index += 1) {
-      const value = values[index];
+      const value = values[index] ?? null;
       if (value !== null && (best === null || value > best)) best = value;
     }
     if (best !== null)
