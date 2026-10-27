@@ -455,3 +455,133 @@ export interface LibraryTarget {
   fetched_at: string | null;
   updated_at: string;
 }
+
+/* ------------------------------------------------- Phase 5: Entwurf */
+
+export interface TmView {
+  available: boolean;
+  tm: Quantity | null;
+  dg: Quantity | null;
+  dh: Quantity | null;
+  ds: Quantity | null;
+  source: string;
+  parameter_set: string;
+  sequence_used: string;
+  hybridisation_type: string;
+  second_opinion_c: number | null;
+  divergence_c: number | null;
+  reliability: string;
+  warnings: string[];
+  approximated: string[];
+  note: string | null;
+}
+
+export interface CleavageSiteView {
+  position: number;
+  junction: string;
+  quality: "gut" | "mäßig" | "schlecht";
+  purine_unpaired: number | null;
+  pyrimidine_paired: number | null;
+  accessibility: number | null;
+  matches_pattern: boolean | null;
+}
+
+export interface ScanView {
+  sites: CleavageSiteView[];
+  hidden_poor: number;
+  counts: Record<string, number>;
+  start: number;
+  end: number;
+  note: string | null;
+}
+
+export interface CriterionView {
+  key: string;
+  label: string;
+  raw: number | null;
+  score: number | null;
+  weight: number;
+  note: string | null;
+}
+
+export interface CandidateView {
+  site: CleavageSiteView;
+  sequence: string;
+  arm5: string;
+  arm3: string;
+  core: string;
+  core_id: string;
+  target_upstream: string;
+  target_downstream: string;
+  length: number;
+  tm5: TmView | null;
+  tm3: TmView | null;
+  arm_dg_sum: number | null;
+  imbalance: number | null;
+  self_fold_mfe: number | null;
+  self_fold_structure: string | null;
+  criteria: CriterionView[];
+  score: number;
+  rating: "good" | "warn" | "bad";
+  binds: boolean;
+  excluded: boolean;
+  exclusion_reason: string | null;
+  warnings: string[];
+}
+
+export interface DesignSettingsView {
+  arm5_length: number;
+  arm3_length: number;
+  core_id: string | null;
+  arm_dg_target: number;
+  max_imbalance: number;
+  self_fold_limit: number;
+  weights: Record<string, number>;
+  include_poor_junctions: boolean;
+}
+
+export interface DesignView {
+  candidates: CandidateView[];
+  settings: DesignSettingsView;
+  core: CoreSpecView | null;
+  skipped_edges: number;
+  scan_note: string | null;
+  disclaimer: string;
+  scan: ScanView;
+  accessibility: AccessibilityView | null;
+  conditions: Record<string, number>;
+}
+
+export interface SnapshotView {
+  sequence: string;
+  length: number;
+  mass: number | null;
+  tm5: number | null;
+  tm3: number | null;
+  arm_dg_sum: number | null;
+  imbalance: number | null;
+  self_fold_mfe: number | null;
+  score: number | null;
+  rating: string | null;
+  /** Wo der Tm nur über ein natürliches Analogon gerechnet wurde. */
+  tm_approximated: string[];
+}
+
+export interface ModificationView {
+  sequence: string;
+  changes: {
+    kind: string;
+    position: number | null;
+    description: string;
+    in_core: boolean;
+  }[];
+  touched_core: boolean;
+  blocked: boolean;
+  message: string | null;
+}
+
+export interface ModifyResultView {
+  modification: ModificationView;
+  before?: SnapshotView;
+  after?: SnapshotView;
+}

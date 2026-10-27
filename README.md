@@ -4,8 +4,8 @@ Lokales Programm zum Rechnen und Visualisieren für modifizierte DNAzyme
 (10-23). Die Projektregeln stehen in [`CLAUDE.md`](CLAUDE.md), die
 Arbeitsschritte in [`PHASEN.md`](PHASEN.md).
 
-**Stand: Phase 4 abgeschlossen** — Massenrechner, Steckbrief, Oberfläche,
-Navigation, Sequenzkarte und die Ziel-RNA.
+**Stand: Phase 5 abgeschlossen** — Massenrechner, Steckbrief, Oberfläche,
+Navigation, Sequenzkarte, die Ziel-RNA und der DNAzym-Entwurf.
 
 ---
 
@@ -173,6 +173,56 @@ Bereich.
 
 ---
 
+## Was Phase 5 kann
+
+**Schmelztemperatur und Thermodynamik.** Tm, ΔH, ΔS und ΔG eines Arms über
+die Nearest-Neighbor-Tabelle für DNA/RNA-Hybride (Sugimoto 1995) — ein
+DNAzym-Arm bindet RNA, nicht DNA. Tm und Thermodynamik stammen aus derselben
+Rechnung, damit sie sich nicht leise widersprechen können; ein Test rechnet
+gegen Biopython gegen. Ist MELTING 5 eingerichtet (`MELTING_DIR` in `.env`),
+läuft es als Zweitmeinung mit vollem Pfad und `shell=False` mit; weichen
+beide um mehr als 3 °C ab, steht eine Warnung dabei.
+
+**Spaltstellen.** Alle Purin-Pyrimidin-Junktionen im gewählten Bereich, mit
+Güte: AU und GU gut, GC mäßig, AC schlecht. AC ist voreingestellt
+ausgeblendet — aber gezählt und einblendbar. Dazu je Stelle, ob das Purin
+offen und das Pyrimidin gepaart ist: ein veröffentlichter Anhaltspunkt, der
+mitgeteilt und nicht zum Ausschluss benutzt wird.
+
+**Kandidaten.** Für jede Stelle ein Strang aus `revcomp(stromab) + Kern +
+revcomp(stromauf)`, bewertet über sechs Kriterien. Kriterien ohne Wert
+werden weggelassen, nicht als Null gewertet — sonst zöge eine fehlende
+Zugänglichkeit jeden Kandidaten gleichmäßig nach unten. Binden die Arme bei
+den gewählten Bedingungen gar nicht (ΣΔG positiv), kommt kein Grün zustande,
+auch wenn die übrigen fünf Kriterien die Punktzahl hochtragen.
+
+**Die Punktzahl ordnet, sie urteilt nicht.** Der Hinweis steht sichtbar über
+der Tabelle und im CSV-Kopf: das beste veröffentlichte Modell erreicht 63 bis
+73 Prozent Trefferquote auf 38 DNAzymen.
+
+**Die Seite „Entwurf"** zeigt oben die Einstellungen, darunter das
+Zugänglichkeitsprofil mit jedem Kandidaten als Marke in seiner Ampelfarbe,
+dann die sortier- und filterbare Rangliste mit einer Ampel je Zeile, und für
+den gewählten Kandidaten die **Paarungsdarstellung**: Ziel-RNA oben in
+5'→3', das DNAzym darunter gegenläufig, Basenpaare als senkrechte Striche,
+Fehlpaarungen als offener Kreis, der Kern als Schleife über der
+Schnittstelle, die Spaltstelle mit einem Pfeil, Modifikationen in ihren
+Farben. Dazu CSV und SVG und „Als Oligo übernehmen".
+
+**Modifikationen als Muster**, mit Vorher-Nachher-Vergleich durch dieselbe
+Rechnung. Ein Eingriff in den katalytischen Kern wird blockiert und verlangt
+eine ausdrückliche Bestätigung (CLAUDE.md, Regel 6) — das ist kein
+HTTP-Fehler, sondern eine Rückfrage.
+
+**Was dabei ehrlich bleiben muss:** eine LNA hebt die Masse um 12 Da je
+Baustein, den gerechneten Tm aber um nichts — die Nearest-Neighbor-Tabelle
+kennt sie nicht und rechnet über das DNA-Analogon. In einer
+Vorher-Nachher-Tabelle läse sich „unverändert" wie „die LNA bewirkt nichts".
+Darum trägt jeder Vergleich die Liste der genäherten Positionen mit und sagt
+ausdrücklich: *das Modell sieht es nicht*.
+
+---
+
 ## Was die Gegenrechnung über das Excel sagt
 
 Die unabhängige Rechnung aus der Summenformel weicht bei der Referenzsequenz
@@ -300,5 +350,10 @@ dort soll aus derselben Quelle kommen wie im Steckbrief.
 
 ## Nächster Schritt
 
-Phase 5 — DNAzym-Entwurf und Bewertung (`PHASEN.md`, Abschnitt 5):
-Spaltstellen finden, Kandidaten bauen und bewerten, MELTING anbinden.
+Phase 6 — Geometrie und 3D (`PHASEN.md`, Abschnitt 6): Referenzstrukturen,
+3D-Modell, Winkel und Abstände.
+
+Noch ungeprüft an Phase 5: die Ausgabe von MELTING 5 wird gegen eine
+nachgebildete Antwort gelesen, nicht gegen das echte Programm — es ist in
+dieser Umgebung nicht installiert. Der Aufruf selbst (voller Pfad,
+`shell=False`, Rückgabecode) ist getestet.

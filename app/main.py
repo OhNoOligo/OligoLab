@@ -36,7 +36,10 @@ from app import (
     synthesis,
     target as target_module,
 )
+from app import design as design_module
 from app import fold_target
+from app import melting as melting_module
+from app import scan as scan_module
 from app.config import PROJECT_ROOT, settings
 from app.registry import (
     get_registry,
@@ -413,6 +416,93 @@ class TargetSaveRequest(BaseModel):
     _check_name = field_validator("name")(_require_name)
 
 
+class ConditionsRequest(BaseModel):
+    """Die Puffereinstellungen aus der Kopfzeile."""
+
+    oligo_conc_nm: float = 1000.0
+    na_mm: float = 50.0
+    k_mm: float = 0.0
+    tris_mm: float = 10.0
+    mg_mm: float = 2.0
+    temperature_c: float = 37.0
+
+    def to_conditions(self) -> melting_module.Conditions:
+        return melting_module.Conditions(
+            oligo_conc_nm=self.oligo_conc_nm,
+            na_mm=self.na_mm,
+            k_mm=self.k_mm,
+            tris_mm=self.tris_mm,
+            mg_mm=self.mg_mm,
+            temperature_c=self.temperature_c,
+        )
+
+
+class MeltingRequest(BaseModel):
+    sequence: str
+    conditions: ConditionsRequest = Field(default_factory=ConditionsRequest)
+
+
+class ScanRequest(BaseModel):
+    sequence: str
+    start: int | None = None
+    end: int | None = None
+    include_poor: bool = False
+    #: Falten und Zugaenglichkeit mitrechnen. Ohne das gibt es die Junktionen
+    #: samt Guete, nur ohne die strukturellen Angaben — und das ist schnell.
+    with_structure: bool = True
+    probe_length: int = 15
+
+
+class DesignSettingsRequest(BaseModel):
+    arm5_length: int = Field(default=9, ge=5, le=20)
+    arm3_length: int = Field(default=9, ge=5, le=20)
+    core_id: str | None = None
+    arm_dg_target: float = -20.0
+    max_imbalance: float = Field(default=4.0, ge=0)
+    self_fold_limit: float = -2.0
+    weight_junction: float = Field(default=0.30, ge=0)
+    weight_arm_dg: float = Field(default=0.25, ge=0)
+    weight_balance: float = Field(default=0.15, ge=0)
+    weight_self_fold: float = Field(default=0.15, ge=0)
+    weight_accessibility: float = Field(default=0.15, ge=0)
+    include_poor_junctions: bool = False
+
+    def to_settings(self) -> design_module.DesignSettings:
+        return design_module.DesignSettings(**self.model_dump())
+
+
+class DesignRequest(ScanRequest):
+    settings: DesignSettingsRequest = Field(default_factory=DesignSettingsRequest)
+    conditions: ConditionsRequest = Field(default_factory=ConditionsRequest)
+    limit: int = Field(default=200, ge=1, le=2000)
+
+
+class ModifyRequest(BaseModel):
+    sequence: str
+    pattern: str
+    #: Erste und letzte Position des katalytischen Kerns, 1-basiert.
+    core_start: int | None = None
+    core_end: int | None = None
+    count: int = Field(default=3, ge=1, le=20)
+    position: int | None = None
+    code: str | None = None
+    #: Die ausdrueckliche Bestaetigung fuer einen Eingriff im Kern
+    #: (CLAUDE.md, Regel 6).
+    allow_core: bool = False
+    #: Fuer den Vorher-Nachher-Vergleich.
+    arm5_length: int = 9
+    core_length: int = 15
+    conditions: ConditionsRequest = Field(default_factory=ConditionsRequest)
+
+
+class CompareRequest(BaseModel):
+    before: str
+    after: str
+    arm5_length: int = 9
+    core_length: int = 15
+    conditions: ConditionsRequest = Field(default_factory=ConditionsRequest)
+
+
 @app.post("/api/target/read")
 def target_read(request: TargetTextRequest) -> dict[str, Any]:
     """Text als Zielsequenz einlesen.
@@ -513,6 +603,231 @@ def target_up(request: UpRequest) -> dict[str, Any]:
         ).as_dict()
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+# ------------------------------------------------- Phase 5: Entwurf
+
+
+@app.post("/api/melting")
+def melting_route(request: MeltingRequest) -> dict[str, Any]:
+    """Tm und Thermodynamik eines Arms (PHASEN.md 5.1).
+
+    Nimmt Synthi-Sprache, damit ein modifizierter Arm dieselbe Rechnung
+    durchlaeuft — die Naeherung ueber das natuerliche Analogon steht dann in
+    `approximated`.
+    """
+    try:
+        oligo = notation.parse(request.sequence, get_registry())
+    except notation.NotationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return melting_module.compute(oligo, request.conditions.to_conditions()).as_dict()
+
+
+def _normalised_target(sequence: str) -> str:
+    try:
+        return target_module.normalise(sequence)
+    except target_module.TargetError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+def _structure_for(
+    sequence: str, request: ScanRequest
+) -> tuple[Any | None, Any | None]:
+    """Faltung und Zugaenglichkeitsprofil — oder zweimal None."""
+    if not request.with_structure:
+        return None, None
+    faltung = fold_target.fold_region(sequence, request.start, request.end)
+    profil = fold_target.accessibility(
+        sequence,
+        start=request.start,
+        end=request.end,
+        probe_length=request.probe_length,
+    )
+    return faltung, profil
+
+
+@app.post("/api/scan")
+def scan_route(request: ScanRequest) -> dict[str, Any]:
+    """Alle Purin-Pyrimidin-Junktionen im gewaehlten Bereich (PHASEN.md 5.2)."""
+    sequence = _normalised_target(request.sequence)
+    try:
+        faltung, profil = _structure_for(sequence, request)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    ergebnis = scan_module.scan(
+        sequence,
+        start=request.start,
+        end=request.end,
+        folding=faltung,
+        accessibility=profil,
+        include_poor=request.include_poor,
+    )
+    return {
+        "scan": ergebnis.as_dict(),
+        "folding": faltung.as_dict() if faltung else None,
+        "accessibility": profil.as_dict() if profil else None,
+    }
+
+
+def _design(request: DesignRequest) -> tuple[Any, Any, Any, str]:
+    sequence = _normalised_target(request.sequence)
+    einstellungen = request.settings.to_settings()
+    einstellungen.include_poor_junctions = request.include_poor
+    try:
+        faltung, profil = _structure_for(sequence, request)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    spaltstellen = scan_module.scan(
+        sequence,
+        start=request.start,
+        end=request.end,
+        folding=faltung,
+        accessibility=profil,
+        include_poor=request.include_poor,
+    )
+    ergebnis = design_module.design(
+        sequence,
+        spaltstellen,
+        settings=einstellungen,
+        conditions=request.conditions.to_conditions(),
+        accessibility=profil,
+        limit=request.limit,
+    )
+    return ergebnis, spaltstellen, profil, sequence
+
+
+@app.post("/api/design")
+def design_route(request: DesignRequest) -> dict[str, Any]:
+    """Kandidaten bauen, bewerten und ordnen (PHASEN.md 5.3).
+
+    Gibt das Zugaenglichkeitsprofil mit zurueck, damit die Entwurfsseite die
+    Kurve und die Kandidatenmarken aus einer Antwort zeichnen kann.
+    """
+    ergebnis, spaltstellen, profil, _ = _design(request)
+    return {
+        **ergebnis.as_dict(),
+        "scan": spaltstellen.as_dict(),
+        "accessibility": profil.as_dict() if profil else None,
+        "conditions": request.conditions.to_conditions().as_dict(),
+    }
+
+
+@app.post("/api/design/candidates.csv", response_class=PlainTextResponse)
+def design_csv(request: DesignRequest) -> str:
+    """Die Kandidatentabelle als CSV (PHASEN.md 5.6)."""
+    ergebnis, _, _, _ = _design(request)
+    spalten = [
+        "Rang", "Position", "Junktion", "Güte", "Arm 5'", "Arm 3'",
+        "dG 5' (kcal/mol)", "dG 3' (kcal/mol)", "Summe dG", "Ungleichgewicht",
+        "Tm 5' (°C)", "Tm 3' (°C)", "Eigenfaltung (kcal/mol)",
+        "Zugänglichkeit", "Punktzahl", "Ampel", "Sequenz",
+    ]
+    zeilen = [";".join(spalten)]
+
+    def z(wert: Any, stellen: int = 2) -> str:
+        if wert is None:
+            return ""
+        if isinstance(wert, float):
+            # Deutsches Dezimalkomma, damit Excel die Zahlen als Zahlen liest.
+            return f"{wert:.{stellen}f}".replace(".", ",")
+        return str(wert)
+
+    for rang, kandidat in enumerate(ergebnis.candidates, start=1):
+        dg5 = kandidat.tm5.dg.value if kandidat.tm5 and kandidat.tm5.dg else None
+        dg3 = kandidat.tm3.dg.value if kandidat.tm3 and kandidat.tm3.dg else None
+        tm5 = kandidat.tm5.tm.value if kandidat.tm5 and kandidat.tm5.tm else None
+        tm3 = kandidat.tm3.tm.value if kandidat.tm3 and kandidat.tm3.tm else None
+        zeilen.append(
+            ";".join(
+                [
+                    z(rang), z(kandidat.site.position), kandidat.site.junction,
+                    kandidat.site.quality, kandidat.arm5, kandidat.arm3,
+                    z(dg5), z(dg3), z(kandidat.arm_dg_sum), z(kandidat.imbalance),
+                    z(tm5), z(tm3),
+                    z(
+                        kandidat.self_fold.mfe.value
+                        if kandidat.self_fold and kandidat.self_fold.mfe
+                        else None
+                    ),
+                    z(kandidat.site.accessibility, 4),
+                    z(kandidat.score, 4), kandidat.rating or "",
+                    kandidat.sequence,
+                ]
+            )
+        )
+    kopf = f"# {design_module.DISCLAIMER}"
+    return "\n".join([kopf, *zeilen]) + "\n"
+
+
+@app.post("/api/modify")
+def modify_route(request: ModifyRequest) -> dict[str, Any]:
+    """Ein Muster auf einen Strang legen, mit Vorher-Nachher (PHASEN.md 5.5).
+
+    Ein Eingriff im katalytischen Kern wird blockiert, solange er nicht
+    ausdruecklich bestaetigt ist (CLAUDE.md, Regel 6). Das ist KEIN
+    HTTP-Fehler — die Oberflaeche soll die Warnung zeigen und nachfragen
+    koennen.
+    """
+    kern = None
+    if request.core_start is not None and request.core_end is not None:
+        kern = (request.core_start, request.core_end)
+    bedingungen = request.conditions.to_conditions()
+    try:
+        ergebnis = design_module.apply_pattern(
+            request.sequence,
+            request.pattern,
+            core_range=kern,
+            count=request.count,
+            position=request.position,
+            code=request.code,
+            allow_core=request.allow_core,
+        )
+    except (ValueError, notation.NotationError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    antwort: dict[str, Any] = {"modification": ergebnis.as_dict()}
+    if not ergebnis.blocked:
+        try:
+            antwort["before"] = design_module.snapshot(
+                request.sequence, request.arm5_length, request.core_length,
+                conditions=bedingungen,
+            ).as_dict()
+            antwort["after"] = design_module.snapshot(
+                ergebnis.sequence, request.arm5_length, request.core_length,
+                conditions=bedingungen,
+            ).as_dict()
+        except notation.NotationError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+    return antwort
+
+
+@app.post("/api/compare")
+def compare_route(request: CompareRequest) -> dict[str, Any]:
+    """Zwei Straenge durch dieselbe Rechnung schicken (PHASEN.md 5.5)."""
+    bedingungen = request.conditions.to_conditions()
+    try:
+        vorher = design_module.snapshot(
+            request.before, request.arm5_length, request.core_length,
+            conditions=bedingungen,
+        )
+        nachher = design_module.snapshot(
+            request.after, request.arm5_length, request.core_length,
+            conditions=bedingungen,
+        )
+    except notation.NotationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return {"before": vorher.as_dict(), "after": nachher.as_dict()}
+
+
+@app.get("/api/design/patterns")
+def design_patterns() -> dict[str, Any]:
+    return {
+        "patterns": [
+            {"id": schluessel, "label": text}
+            for schluessel, text in design_module.PATTERNS.items()
+        ],
+        "disclaimer": design_module.DISCLAIMER,
+    }
 
 
 @app.get("/api/library/targets")

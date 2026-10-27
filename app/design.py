@@ -618,3 +618,361 @@ __all__ = [
 
 #: Alias, damit der Hinweis auch unter dem sprechenderen Namen zu finden ist.
 DESIGN_DISCLAIMER = DISCLAIMER
+
+
+# ------------------------------------------- 5.5 Modifikationen aufbringen
+
+
+@dataclass
+class ModificationChange:
+    """Was ein Muster an einer Stelle geaendert hat."""
+
+    kind: str
+    position: int | None
+    description: str
+    in_core: bool = False
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "position": self.position,
+            "description": self.description,
+            "in_core": self.in_core,
+        }
+
+
+@dataclass
+class ModificationResult:
+    sequence: str
+    changes: list[ModificationChange] = field(default_factory=list)
+    touched_core: bool = False
+    blocked: bool = False
+    message: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "sequence": self.sequence,
+            "changes": [c.as_dict() for c in self.changes],
+            "touched_core": self.touched_core,
+            "blocked": self.blocked,
+            "message": self.message,
+        }
+
+
+PATTERNS = {
+    "arms_phosphorothioate": "Alle Arme als Phosphorothioat",
+    "lna_ends": "Die äußersten Positionen jedes Endes als LNA",
+    "galnac_5prime": "5'-GalNAc anhängen",
+    "replace_position": "Position durch eigenen Baustein ersetzen",
+}
+
+
+def apply_pattern(
+    sequence: str,
+    pattern: str,
+    core_range: tuple[int, int] | None = None,
+    count: int = 3,
+    position: int | None = None,
+    code: str | None = None,
+    allow_core: bool = False,
+    registry: Registry | None = None,
+) -> ModificationResult:
+    """Ein Muster auf einen Strang legen (PHASEN.md 5.5).
+
+    Der katalytische Kern bleibt voreingestellt unangetastet. Ein Eingriff
+    dort verlangt `allow_core=True` — und das ist keine Formalie: eine
+    Modifikation im Kern kostet haeufig die gesamte Aktivitaet (CLAUDE.md,
+    Regel 6).
+    """
+    from dataclasses import replace as _replace
+
+    from app.models import Conjugate, Linkage, Monomer
+    from app.notation import to_string
+
+    reg = registry or get_registry()
+    oligo = parse(sequence, reg)
+    laenge = oligo.length
+
+    def im_kern(pos: int) -> bool:
+        return core_range is not None and core_range[0] <= pos <= core_range[1]
+
+    aenderungen: list[ModificationChange] = []
+    monomere = list(oligo.monomers)
+    bindungen = list(oligo.linkages)
+    konjugate = list(oligo.conjugates)
+    kern_beruehrt = False
+
+    def mit_modifikation(monomer: Monomer, mod_code: str) -> Monomer | None:
+        spec = reg.modification(mod_code)
+        if spec is None:
+            return None
+        if any(m.code == mod_code for m in monomer.modifications):
+            return monomer
+        return _replace(
+            monomer,
+            modifications=monomer.modifications + (spec,),
+            source=f"[{mod_code}-{monomer.spec.code}]",
+        )
+
+    if pattern == "arms_phosphorothioate":
+        thioat = reg.modification("Thioat")
+        for index, bindung in enumerate(bindungen):
+            # Eine Bindung gehoert zum Kern, wenn BEIDE Nachbarn darin liegen.
+            drin = im_kern(bindung.position) and im_kern(bindung.position + 1)
+            if drin and not allow_core:
+                continue
+            if drin:
+                kern_beruehrt = True
+            if bindung.kind == "phosphorothioate":
+                continue
+            bindungen[index] = Linkage(
+                position=bindung.position,
+                kind="phosphorothioate",
+                modification=thioat,
+            )
+            aenderungen.append(
+                ModificationChange(
+                    "phosphorothioate", bindung.position,
+                    f"Bindung {bindung.position}–{bindung.position + 1} "
+                    "als Phosphorothioat",
+                    in_core=drin,
+                )
+            )
+
+    elif pattern == "lna_ends":
+        if count < 1:
+            raise ValueError("Es müssen mindestens eine Position sein.")
+        stellen = set(range(1, min(count, laenge) + 1))
+        stellen |= set(range(max(1, laenge - count + 1), laenge + 1))
+        for pos in sorted(stellen):
+            drin = im_kern(pos)
+            if drin and not allow_core:
+                continue
+            neu = mit_modifikation(monomere[pos - 1], "LNA")
+            if neu is None:
+                continue
+            if drin:
+                kern_beruehrt = True
+            monomere[pos - 1] = neu
+            aenderungen.append(
+                ModificationChange("lna", pos, f"Position {pos} als LNA", in_core=drin)
+            )
+
+    elif pattern == "galnac_5prime":
+        spec = reg.modification("5GalNAc")
+        if spec is None:
+            return ModificationResult(
+                sequence=sequence, blocked=True,
+                message="5GalNAc ist in modifications.yaml nicht angelegt.",
+            )
+        if any(k.code == "5GalNAc" and k.attach == "5prime" for k in konjugate):
+            return ModificationResult(
+                sequence=sequence,
+                message="Am 5'-Ende hängt schon ein GalNAc.",
+            )
+        konjugate.insert(0, Conjugate(spec=spec, attach="5prime"))
+        aenderungen.append(
+            ModificationChange("conjugate", None, "5'-GalNAc angehängt")
+        )
+
+    elif pattern == "replace_position":
+        if position is None or code is None:
+            raise ValueError(
+                "Zum Ersetzen braucht es eine Position und einen Bausteincode."
+            )
+        if not (1 <= position <= laenge):
+            raise ValueError(f"Position {position} liegt nicht im Strang (1–{laenge}).")
+        drin = im_kern(position)
+        if drin and not allow_core:
+            return ModificationResult(
+                sequence=sequence, blocked=True, touched_core=True,
+                message=(
+                    f"Position {position} liegt im katalytischen Kern. "
+                    "Eingriffe dort kosten häufig die gesamte Aktivität und "
+                    "verlangen eine ausdrückliche Bestätigung."
+                ),
+            )
+        spec = reg.monomer(code)
+        if spec is None:
+            mod = reg.modification(code)
+            alt = monomere[position - 1]
+            neu = mit_modifikation(alt, code) if mod else None
+            if neu is None:
+                return ModificationResult(
+                    sequence=sequence, blocked=True,
+                    message=f"`{code}` ist weder ein Baustein noch eine Modifikation.",
+                )
+        else:
+            neu = Monomer(
+                position=position, spec=spec, modifications=(),
+                source=spec.code if len(spec.code) == 1 else f"[{spec.code}]",
+            )
+        if drin:
+            kern_beruehrt = True
+        monomere[position - 1] = neu
+        aenderungen.append(
+            ModificationChange(
+                "replace", position,
+                f"Position {position} durch {code} ersetzt", in_core=drin,
+            )
+        )
+
+    else:
+        raise ValueError(f"Unbekanntes Muster `{pattern}`.")
+
+    neues_oligo = Oligo(
+        monomers=monomere, linkages=bindungen, conjugates=konjugate,
+        name=oligo.name, notes=oligo.notes,
+    )
+
+    nachricht = None
+    if core_range and not allow_core and pattern != "galnac_5prime":
+        ausgelassen = sum(
+            1
+            for pos in range(core_range[0], core_range[1] + 1)
+            if not any(c.position == pos for c in aenderungen)
+        )
+        if ausgelassen:
+            nachricht = (
+                f"Der katalytische Kern (Position {core_range[0]}–{core_range[1]}) "
+                "blieb unangetastet. Eingriffe dort verlangen eine ausdrückliche "
+                "Bestätigung."
+            )
+    if kern_beruehrt:
+        nachricht = (
+            f"ACHTUNG: {sum(1 for c in aenderungen if c.in_core)} Änderung(en) "
+            "liegen im katalytischen Kern. Das kostet häufig die gesamte "
+            "Aktivität."
+        )
+
+    return ModificationResult(
+        sequence=to_string(neues_oligo),
+        changes=aenderungen,
+        touched_core=kern_beruehrt,
+        message=nachricht,
+    )
+
+
+# ---------------------------------------- 5.5 vorher gegen nachher stellen
+
+
+@dataclass
+class Snapshot:
+    """Die vergleichbaren Groessen eines Strangs (PHASEN.md 5.5)."""
+
+    sequence: str
+    length: int
+    mass: float | None
+    tm5: float | None
+    tm3: float | None
+    arm_dg_sum: float | None
+    imbalance: float | None
+    self_fold_mfe: float | None
+    score: float | None
+    rating: str | None
+    #: Wo der Tm nur ueber ein natuerliches Analogon gerechnet wurde.
+    #:
+    #: Wichtig fuer den Vorher-Nachher-Vergleich: eine LNA hebt den Tm
+    #: erheblich, aber die Nearest-Neighbor-Tabelle kennt sie nicht. Ohne
+    #: diesen Vermerk laese sich "Tm unveraendert" als "LNA bewirkt nichts" —
+    #: gemeint ist aber "das Modell sieht es nicht".
+    tm_approximated: list[str] = field(default_factory=list)
+
+    def as_dict(self) -> dict[str, Any]:
+        def r(value: float | None, digits: int = 2) -> float | None:
+            return None if value is None else round(value, digits)
+
+        return {
+            "sequence": self.sequence,
+            "length": self.length,
+            "mass": r(self.mass),
+            "tm5": r(self.tm5),
+            "tm3": r(self.tm3),
+            "arm_dg_sum": r(self.arm_dg_sum),
+            "imbalance": r(self.imbalance),
+            "self_fold_mfe": r(self.self_fold_mfe),
+            "score": r(self.score, 4),
+            "rating": self.rating,
+            "tm_approximated": self.tm_approximated,
+        }
+
+
+def snapshot(
+    sequence: str,
+    arm5_length: int,
+    core_length: int,
+    site: CleavageSite | None = None,
+    settings: DesignSettings | None = None,
+    conditions: melting.Conditions | None = None,
+    registry: Registry | None = None,
+) -> Snapshot:
+    """Masse, Tm, ΔG, Eigenfaltung und Punktzahl eines Strangs.
+
+    Arbeitet auf dem Sequenztext, nicht auf einem `Candidate` — damit laesst
+    sich derselbe Strang vor und nach dem Aufbringen einer Modifikation
+    durch dieselbe Rechnung schicken.
+    """
+    from app import mass as mass_module
+
+    reg = registry or get_registry()
+    einst = settings or DesignSettings()
+    bed = conditions or melting.Conditions()
+
+    oligo = parse(sequence, reg)
+
+    # Die Arme in der Monomerliste, nicht im Text: eine `[LNA-T]`-Schreibweise
+    # macht den Text laenger, den Strang aber nicht.
+    arm5_monomere = oligo.monomers[:arm5_length]
+    arm3_monomere = oligo.monomers[arm5_length + core_length :]
+
+    def teil(monomere: list) -> Oligo:
+        return Oligo(
+            monomers=[
+                replace(m, position=index + 1) for index, m in enumerate(monomere)
+            ],
+            linkages=[],
+        )
+
+    tm5 = melting.compute(teil(arm5_monomere), bed) if arm5_monomere else None
+    tm3 = melting.compute(teil(arm3_monomere), bed) if arm3_monomere else None
+    eigen = fold.compute(oligo, reg, with_homodimer=False)
+    masse = mass_module.compute(oligo, reg).fully_deprotected.value
+
+    def dg(result: melting.TmResult | None) -> float | None:
+        return result.dg.value if result and result.dg else None
+
+    dg5, dg3 = dg(tm5), dg(tm3)
+    summe = None if dg5 is None or dg3 is None else dg5 + dg3
+    unterschied = None if dg5 is None or dg3 is None else abs(dg5 - dg3)
+
+    punktzahl: float | None = None
+    bewertung: str | None = None
+    if site is not None:
+        ersatz = Candidate(
+            site=site, sequence=sequence,
+            arm5="", arm3="", core="", core_id="",
+            target_upstream="", target_downstream="",
+            tm5=tm5, tm3=tm3, self_fold=eigen,
+        )
+        bewertet = score(ersatz, einst, reg)
+        punktzahl = bewertet.score
+        bewertung = bewertet.rating
+
+    genaehert: list[str] = []
+    for ergebnis in (tm5, tm3):
+        if ergebnis:
+            genaehert += ergebnis.approximated
+
+    return Snapshot(
+        sequence=sequence,
+        length=oligo.length,
+        mass=masse,
+        tm5=tm5.tm.value if tm5 and tm5.tm else None,
+        tm3=tm3.tm.value if tm3 and tm3.tm else None,
+        arm_dg_sum=summe,
+        imbalance=unterschied,
+        self_fold_mfe=eigen.mfe.value if eigen.mfe else None,
+        score=punktzahl,
+        rating=bewertung,
+        tm_approximated=genaehert,
+    )

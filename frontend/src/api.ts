@@ -8,11 +8,12 @@
 import type {
   AccessibilityView,
   ConsumptionTable,
+  CandidateView,
   CoreSpecView,
+  DesignView,
   FetchResultView,
   LibraryTarget,
   StrandView,
-  TargetFoldView,
   TargetView,
   UpView,
   HelpEntry,
@@ -21,9 +22,14 @@ import type {
   LoadingRecipe,
   ModificationSpecView,
   MonomerCatalog,
+  ModifyResultView,
   NotationProblem,
   OdConversion,
   Profile,
+  ScanView,
+  SnapshotView,
+  TargetFoldView,
+  TmView,
 } from "./types";
 
 export class ApiError extends Error {
@@ -74,6 +80,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 const post = <T,>(path: string, body: unknown) =>
   request<T>(path, { method: "POST", body: JSON.stringify(body) });
+
+export interface DesignBody {
+  sequence: string;
+  start?: number;
+  end?: number;
+  include_poor?: boolean;
+  with_structure?: boolean;
+  probe_length?: number;
+  settings?: Partial<{
+    arm5_length: number;
+    arm3_length: number;
+    core_id: string | null;
+    arm_dg_target: number;
+    max_imbalance: number;
+    self_fold_limit: number;
+    weight_junction: number;
+    weight_arm_dg: number;
+    weight_balance: number;
+    weight_self_fold: number;
+    weight_accessibility: number;
+  }>;
+  conditions?: Record<string, number>;
+  limit?: number;
+}
 
 export const api = {
   health: () => request<{ status: string; version: string }>("/api/health"),
@@ -195,6 +225,67 @@ export const api = {
     nmol?: number | null;
     microgram?: number | null;
   }) => post<OdConversion>("/api/concentration/od", body),
+
+  /* -------------------------------------------- Phase 5: Entwurf */
+
+  melting: (sequence: string, conditions?: Record<string, number>) =>
+    post<TmView>("/api/melting", { sequence, conditions }),
+
+  scan: (body: {
+    sequence: string;
+    start?: number;
+    end?: number;
+    include_poor?: boolean;
+    with_structure?: boolean;
+    probe_length?: number;
+  }) =>
+    post<{
+      scan: ScanView;
+      folding: TargetFoldView | null;
+      accessibility: import("./types").AccessibilityView | null;
+    }>("/api/scan", body),
+
+  design: (body: DesignBody) => post<DesignView>("/api/design", body),
+
+  /** Dieselbe Anfrage, aber als CSV-Text (PHASEN.md 5.6). */
+  designCsv: async (body: DesignBody): Promise<string> => {
+    const response = await fetch("/api/design/candidates.csv", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, null, "Der CSV-Export ist fehlgeschlagen.");
+    }
+    return response.text();
+  },
+
+  modify: (body: {
+    sequence: string;
+    pattern: string;
+    core_start?: number | null;
+    core_end?: number | null;
+    count?: number;
+    position?: number | null;
+    code?: string | null;
+    allow_core?: boolean;
+    arm5_length?: number;
+    core_length?: number;
+    conditions?: Record<string, number>;
+  }) => post<ModifyResultView>("/api/modify", body),
+
+  compare: (body: {
+    before: string;
+    after: string;
+    arm5_length?: number;
+    core_length?: number;
+    conditions?: Record<string, number>;
+  }) => post<{ before: SnapshotView; after: SnapshotView }>("/api/compare", body),
+
+  patterns: () =>
+    request<{ patterns: { id: string; label: string }[]; disclaimer: string }>(
+      "/api/design/patterns",
+    ),
 
   monomers: () => request<MonomerCatalog>("/api/monomers"),
 

@@ -412,3 +412,118 @@ entries:
     short: >
       Hängt am Ende und zählt nicht zur Basenzahl. Bekommt auch keine
       Schutzgruppe zugeordnet.
+
+  # ------------------------------------------------ Phase 5: Entwurf
+  field.design:
+    title: "Entwurf"
+    short: >
+      Sucht in der Ziel-RNA die Stellen, an denen ein 10-23 schneiden kann,
+      baut für jede einen Strang und ordnet sie nach sechs Kriterien.
+  field.design.settings:
+    title: "Einstellungen des Entwurfs"
+    short: >
+      Armlängen und Schwellen. Die Schwellen verschieben nur die Bewertung,
+      nicht die Rechnung — ein Kandidat verschwindet dadurch nicht.
+  field.arm5:
+    title: "Länge des 5'-Arms"
+    short: >
+      Der 5'-Arm bindet STROMAB der Spaltstelle. 9 Bausteine je Arm sind der
+      verbreitete Ausgangswert; kürzer wird schneller freigesetzt, länger
+      bindet fester.
+  field.arm3:
+    title: "Länge des 3'-Arms"
+    short: >
+      Der 3'-Arm bindet STROMAUF der Spaltstelle. Beide Arme sollten ähnlich
+      fest binden — der Unterschied steht als eigene Spalte in der Tabelle.
+  field.arm_dg_target:
+    title: "Zielwert für ΣΔG"
+    short: >
+      Die gewünschte Summe der freien Energien beider Arme. Zu schwach bindet
+      nicht, zu fest lässt das Produkt nicht mehr los — darum ein Zielwert und
+      keine Untergrenze.
+  field.max_imbalance:
+    title: "Höchster Unterschied der Arme"
+    short: >
+      Wie weit ΔG der beiden Arme auseinanderliegen darf. Ein sehr ungleiches
+      Paar bindet einseitig und schneidet schlechter.
+  field.self_fold_limit:
+    title: "Grenze der Eigenfaltung"
+    short: >
+      Ab welcher freien Energie die Eigenfaltung des Strangs als störend
+      gilt. Ein Strang, der sich selbst festhält, bindet das Ziel nicht.
+  field.design.limit:
+    title: "Höchstzahl der Kandidaten"
+    short: >
+      Je Kandidat laufen zwei Tm-Rechnungen und eine Faltung. Ein Transkript
+      von mehreren Kilobasen hat Tausende von Junktionen — darum ein Deckel.
+  field.include_poor:
+    title: "AC-Junktionen mitnehmen"
+    short: >
+      AC ist die schlechteste der vier Junktionen und schneidet oft gar nicht.
+      Sie ist voreingestellt ausgeblendet, aber ihre Zahl steht immer dabei.
+  field.with_structure:
+    title: "Faltung mitrechnen"
+    short: >
+      Ohne sie gibt es die Junktionen samt Güte, nur ohne Zugänglichkeit und
+      ohne Paarungszustand — dafür sofort.
+  field.pattern:
+    title: "Modifikationsmuster"
+    short: >
+      Legt eine Modifikation auf den ganzen Strang: Thioat in den Armen, LNA
+      an den Enden, GalNAc am 5'-Ende. Der katalytische Kern bleibt dabei
+      unangetastet.
+  result.profile:
+    title: "Zugänglichkeit mit Kandidaten"
+    short: >
+      Die Kurve aus Phase 4, darunter jede gefundene Spaltstelle als Marke in
+      ihrer Ampelfarbe. Ein Klick auf eine Marke wählt den Kandidaten aus.
+  result.candidates:
+    title: "Rangliste"
+    short: >
+      Alle Kandidaten, nach Punktzahl geordnet. Jede Spaltenüberschrift
+      sortiert um. Die Ampel je Zeile fasst die sechs Kriterien zusammen.
+  result.candidate.position:
+    title: "Position der Spaltstelle"
+    short: >
+      Geschnitten wird zwischen den beiden genannten Positionen, also
+      zwischen dem Purin und dem folgenden Pyrimidin.
+  result.candidate.junction:
+    title: "Art der Junktion"
+    short: >
+      AU und GU schneiden gut, GC mäßig, AC schlecht. Das ist der am besten
+      belegte Einzelfaktor und wiegt darum am schwersten.
+  result.candidate.arm_dg:
+    title: "ΣΔG beider Arme"
+    short: >
+      Die Summe der freien Bindungsenergien. Ein positiver Wert heißt: bei
+      diesen Bedingungen bindet der Strang gar nicht — dann gibt es kein Grün.
+  result.candidate.imbalance:
+    title: "Unterschied der Arme"
+    short: >
+      Der Betrag der Differenz der beiden ΔG. Klein ist gut.
+  result.candidate.self_fold:
+    title: "Eigenfaltung"
+    short: >
+      Die freie Energie der stabilsten Faltung des DNAzyms mit sich selbst.
+      Je negativer, desto mehr hält der Strang sich selbst fest.
+  result.candidate.accessibility:
+    title: "Zugänglichkeit am Schnitt"
+    short: >
+      Wahrscheinlichkeit, dass die Stelle in der gefalteten Ziel-RNA offen
+      genug für einen Arm ist. Aus dem Profil der Phase 4.
+  result.candidate.score:
+    title: "Punktzahl"
+    short: >
+      Der gewichtete Mittelwert der Kriterien, für die es Werte gibt. Eine
+      Rangfolge, keine Vorhersage der Rate — fehlende Kriterien werden nicht
+      als Null gewertet, sondern weggelassen.
+  result.pairing:
+    title: "Paarungsdarstellung"
+    short: >
+      Ziel-RNA oben in 5'→3', das DNAzym darunter gegenläufig, Basenpaare als
+      senkrechte Striche, der Kern als Schleife über der Schnittstelle.
+  method.turnover:
+    title: "Freisetzung des Produkts"
+    short: >
+      Nach dem Schnitt müssen die Hälften abfallen, sonst schneidet der Strang
+      nur einmal. Binden die Arme zu fest, steht Umsatz gegen Bindung.

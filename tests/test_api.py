@@ -579,3 +579,186 @@ def test_ziel_ohne_namen_wird_abgewiesen(client):
         "/api/library/targets", json={"name": "  ", "sequence": "ACGU"}
     )
     assert antwort.status_code == 422
+
+
+# ================================================ Phase 5: Entwurfsseite
+
+#: Ein kurzes Ziel mit einer GU-Junktion in der Mitte.
+ZIEL = "ACACCACACCACACGUACCACACCACACCA"
+DNAZYM = "TTGGGGTAAGGCTAGCTACAACGAGGTGCATGT"
+
+
+def test_schmelztemperatur_eines_arms(client):
+    antwort = client.post("/api/melting", json={"sequence": "TTGGGGTAA"})
+    assert antwort.status_code == 200
+    daten = antwort.json()
+    assert daten["available"] is True
+    assert 20 < daten["tm"]["value"] < 60
+    assert "DNA/RNA" in daten["tm"]["method"]
+
+
+def test_schmelztemperatur_eines_modifizierten_arms(client):
+    """Die Näherung muss in der Antwort stehen (CLAUDE.md, Regel 3)."""
+    antwort = client.post("/api/melting", json={"sequence": "TTGG[LNA-T]GTAA"})
+    daten = antwort.json()
+    assert daten["reliability"] == "genähert über natürliches Analogon"
+    assert any("LNA" in e for e in daten["approximated"])
+
+
+def test_schmelztemperatur_mit_kaputter_sequenz(client):
+    assert client.post("/api/melting", json={"sequence": "ACGX"}).status_code == 422
+
+
+def test_spaltstellen_suchen(client):
+    antwort = client.post("/api/scan", json={"sequence": ZIEL, "with_structure": False})
+    assert antwort.status_code == 200
+    daten = antwort.json()
+    positionen = [s["position"] for s in daten["scan"]["sites"]]
+    assert ZIEL.index("GU") + 1 in positionen
+    assert daten["folding"] is None and daten["accessibility"] is None
+
+
+def test_schlechte_junktionen_werden_gezaehlt_nicht_verschwiegen(client):
+    """AC ist ausgeblendet, aber die Zahl steht dabei (PHASEN.md 5.2)."""
+    ohne = client.post(
+        "/api/scan", json={"sequence": ZIEL, "with_structure": False}
+    ).json()["scan"]
+    assert ohne["hidden_poor"] > 0
+    assert "AC" in (ohne["note"] or "")
+
+    mit = client.post(
+        "/api/scan",
+        json={"sequence": ZIEL, "with_structure": False, "include_poor": True},
+    ).json()["scan"]
+    assert len(mit["sites"]) == len(ohne["sites"]) + ohne["hidden_poor"]
+    assert mit["hidden_poor"] == 0
+
+
+def test_entwurf_liefert_kandidaten_und_profil(client):
+    """Eine Antwort muss für Tabelle UND Kurve reichen (PHASEN.md 5.6)."""
+    antwort = client.post("/api/design", json={"sequence": ZIEL})
+    assert antwort.status_code == 200
+    daten = antwort.json()
+    assert daten["candidates"], "es muss Kandidaten geben"
+    assert daten["accessibility"] is not None, "die Kurve kommt mit"
+    assert daten["core"]["id"]
+    assert daten["disclaimer"]
+
+    bester = daten["candidates"][0]
+    assert len(bester["arm5"]) == 9 and len(bester["arm3"]) == 9
+    assert bester["rating"] in {"good", "warn", "bad"}
+    assert bester["criteria"], "jedes Kriterium einzeln, nicht nur die Summe"
+
+
+def test_entwurf_mit_eigenen_armlaengen(client):
+    antwort = client.post(
+        "/api/design",
+        json={
+            "sequence": ZIEL,
+            "with_structure": False,
+            "settings": {"arm5_length": 7, "arm3_length": 11},
+        },
+    )
+    bester = antwort.json()["candidates"][0]
+    assert len(bester["arm5"]) == 7
+    assert len(bester["arm3"]) == 11
+
+
+def test_unsinnige_armlaenge_wird_abgewiesen(client):
+    antwort = client.post(
+        "/api/design", json={"sequence": ZIEL, "settings": {"arm5_length": 2}}
+    )
+    assert antwort.status_code == 422
+
+
+def test_kandidaten_als_csv(client):
+    antwort = client.post("/api/design/candidates.csv", json={"sequence": ZIEL})
+    assert antwort.status_code == 200
+    zeilen = antwort.text.splitlines()
+    assert zeilen[0].startswith("# ")
+    assert "Rangfolge" in zeilen[0], "der Hinweis steht über der Tabelle"
+    assert zeilen[1].startswith("Rang;Position;Junktion")
+    assert len(zeilen) > 2
+    # Deutsches Dezimalkomma, und kein Objekt im Text.
+    assert "Quantity" not in antwort.text
+    felder = zeilen[2].split(";")
+    assert felder[0] == "1"
+    assert "," in felder[6], "ΔG muss eine Zahl mit Komma sein"
+
+
+def test_muster_aufbringen_mit_vorher_nachher(client):
+    antwort = client.post(
+        "/api/modify",
+        json={
+            "sequence": DNAZYM, "pattern": "lna_ends",
+            "core_start": 10, "core_end": 24, "count": 3,
+        },
+    )
+    assert antwort.status_code == 200
+    daten = antwort.json()
+    assert daten["modification"]["blocked"] is False
+    assert daten["modification"]["touched_core"] is False
+    assert daten["before"]["mass"] == pytest.approx(10241.26, abs=0.01)
+    assert daten["after"]["mass"] - daten["before"]["mass"] == pytest.approx(72, abs=0.1)
+    # Der Tm bleibt gleich — und die Antwort sagt, warum.
+    assert daten["after"]["tm5"] == pytest.approx(daten["before"]["tm5"], abs=0.01)
+    assert len(daten["after"]["tm_approximated"]) == 6
+
+
+def test_eingriff_im_kern_wird_blockiert_aber_ist_kein_fehler(client):
+    """CLAUDE.md, Regel 6 — die Oberfläche soll nachfragen können."""
+    antwort = client.post(
+        "/api/modify",
+        json={
+            "sequence": DNAZYM, "pattern": "replace_position",
+            "core_start": 10, "core_end": 24, "position": 13, "code": "LNA",
+        },
+    )
+    assert antwort.status_code == 200, "kein HTTP-Fehler, sondern eine Rückfrage"
+    daten = antwort.json()
+    assert daten["modification"]["blocked"] is True
+    assert daten["modification"]["sequence"] == DNAZYM
+    assert "Kern" in daten["modification"]["message"]
+    assert "before" not in daten, "ohne Änderung gibt es nichts zu vergleichen"
+
+
+def test_eingriff_im_kern_nach_bestaetigung(client):
+    antwort = client.post(
+        "/api/modify",
+        json={
+            "sequence": DNAZYM, "pattern": "replace_position",
+            "core_start": 10, "core_end": 24, "position": 13, "code": "LNA",
+            "allow_core": True,
+        },
+    )
+    daten = antwort.json()["modification"]
+    assert daten["blocked"] is False
+    assert daten["touched_core"] is True
+    assert "ACHTUNG" in daten["message"]
+
+
+def test_unbekanntes_muster_ist_ein_fehler(client):
+    antwort = client.post(
+        "/api/modify", json={"sequence": DNAZYM, "pattern": "frei erfunden"}
+    )
+    assert antwort.status_code == 422
+
+
+def test_zwei_straenge_vergleichen(client):
+    antwort = client.post(
+        "/api/compare",
+        json={"before": DNAZYM, "after": "/5GalNAc/" + DNAZYM},
+    )
+    assert antwort.status_code == 200
+    daten = antwort.json()
+    assert daten["before"]["length"] == daten["after"]["length"] == 33
+    # GalNAc hat keine hinterlegte Masse — die Antwort erfindet keine.
+    assert daten["after"]["mass"] is None or daten["after"]["mass"] > 0
+
+
+def test_musterliste(client):
+    daten = client.get("/api/design/patterns").json()
+    kennungen = {m["id"] for m in daten["patterns"]}
+    assert "arms_phosphorothioate" in kennungen
+    assert "lna_ends" in kennungen
+    assert daten["disclaimer"]

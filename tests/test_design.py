@@ -330,3 +330,135 @@ def test_kandidat_laesst_sich_als_oligo_lesen(entwurf, registry):
     oligo = design.as_oligo(entwurf.candidates[0], registry)
     assert oligo.length == len(entwurf.candidates[0].sequence)
     assert oligo.monomers[0].code in "ACGT"
+
+
+# =============================================== 5.5 Muster aufbringen
+
+#: Das Regressions-DNAzym aus CLAUDE.md, Arm 9 + Kern 15 + Arm 9.
+DNAZYM = "TTGGGGTAAGGCTAGCTACAACGAGGTGCATGT"
+KERN = (10, 24)
+
+
+def test_thioat_nur_in_den_armen(registry):
+    ergebnis = design.apply_pattern(
+        DNAZYM, "arms_phosphorothioate", core_range=KERN, registry=registry
+    )
+    assert ergebnis.blocked is False
+    assert ergebnis.touched_core is False
+    # 8 Bindungen im 5'-Arm, 8 im 3'-Arm, plus die beiden Bindungen vom Arm
+    # in den Kern — die gehören noch zum Arm, weil nur eine Seite im Kern liegt.
+    assert len(ergebnis.changes) == 18
+    assert "GGCTAGCTACAACGA" in ergebnis.sequence, "der Kern bleibt unberührt"
+    assert ergebnis.sequence.startswith("T*T*G*")
+
+
+def test_lna_setzt_sich_an_die_enden(registry):
+    ergebnis = design.apply_pattern(
+        DNAZYM, "lna_ends", core_range=KERN, count=3, registry=registry
+    )
+    assert ergebnis.sequence.startswith("[LNA-T][LNA-T][LNA-G]")
+    assert ergebnis.sequence.endswith("[LNA-T][LNA-G][LNA-T]")
+    assert len(ergebnis.changes) == 6
+    assert ergebnis.touched_core is False
+
+
+def test_galnac_haengt_vorn(registry):
+    ergebnis = design.apply_pattern(
+        DNAZYM, "galnac_5prime", core_range=KERN, registry=registry
+    )
+    assert ergebnis.sequence.startswith("/5GalNAc/")
+    assert len(ergebnis.changes) == 1
+
+
+def test_eingriff_in_den_kern_wird_blockiert(registry):
+    """CLAUDE.md, Regel 6 — nie stillschweigend."""
+    ergebnis = design.apply_pattern(
+        DNAZYM, "replace_position", core_range=KERN,
+        position=13, code="LNA", registry=registry,
+    )
+    assert ergebnis.blocked is True
+    assert ergebnis.sequence == DNAZYM, "nichts darf geändert worden sein"
+    assert "katalytischen Kern" in (ergebnis.message or "")
+
+
+def test_eingriff_in_den_kern_nach_bestaetigung(registry):
+    ergebnis = design.apply_pattern(
+        DNAZYM, "replace_position", core_range=KERN,
+        position=13, code="LNA", allow_core=True, registry=registry,
+    )
+    assert ergebnis.blocked is False
+    assert ergebnis.touched_core is True
+    assert "ACHTUNG" in (ergebnis.message or "")
+    assert ergebnis.changes[0].in_core is True
+
+
+def test_unbekanntes_muster(registry):
+    """Ein unbekanntes Muster ist ein Aufruffehler, keine Nutzerentscheidung.
+
+    `blocked` ist dem Kernschutz vorbehalten — der heißt „darf, aber nur mit
+    Bestätigung". Hier dagegen gibt es nichts zu bestätigen.
+    """
+    with pytest.raises(ValueError, match="Unbekanntes Muster"):
+        design.apply_pattern(DNAZYM, "irgendwas", registry=registry)
+
+
+# =========================================== 5.5 vorher gegen nachher
+
+
+@pytest.fixture
+def stelle():
+    return scan.CleavageSite(50, "GU", "gut", accessibility=0.8)
+
+
+def test_vergleich_zeigt_was_sich_aendert(registry, stelle):
+    vorher = design.snapshot(DNAZYM, 9, 15, site=stelle, registry=registry)
+    nachher_sequenz = design.apply_pattern(
+        DNAZYM, "lna_ends", core_range=KERN, count=3, registry=registry
+    ).sequence
+    nachher = design.snapshot(nachher_sequenz, 9, 15, site=stelle, registry=registry)
+
+    # Die Länge zählt Bausteine, nicht Zeichen.
+    assert vorher.length == nachher.length == 33
+    # Sechs LNA, jede 12,0 Da mehr (Methylenbrücke).
+    assert nachher.mass - vorher.mass == pytest.approx(72.0, abs=0.05)
+    assert vorher.mass == pytest.approx(10241.26, abs=0.01)
+
+
+def test_unveraenderter_tm_wird_als_genaehert_erklaert(registry, stelle):
+    """Der Tm bleibt gleich, weil die Tabelle keine LNA kennt.
+
+    Ohne diesen Vermerk läse sich die Vorher-Nachher-Tabelle wie „LNA bewirkt
+    nichts" — gemeint ist „das Modell sieht es nicht" (CLAUDE.md, Regel 3).
+    """
+    vorher = design.snapshot(DNAZYM, 9, 15, site=stelle, registry=registry)
+    assert vorher.tm_approximated == []
+
+    nachher_sequenz = design.apply_pattern(
+        DNAZYM, "lna_ends", core_range=KERN, count=3, registry=registry
+    ).sequence
+    nachher = design.snapshot(nachher_sequenz, 9, 15, site=stelle, registry=registry)
+
+    assert nachher.tm5 == pytest.approx(vorher.tm5, abs=0.001)
+    assert nachher.tm_approximated, "die Näherung muss benannt werden"
+    assert all("LNA" in e for e in nachher.tm_approximated)
+    assert len(nachher.tm_approximated) == 6
+
+
+def test_vergleich_ohne_spaltstelle_laesst_die_punktzahl_weg(registry):
+    """Ohne Ziel gibt es keine Zugänglichkeit und damit keine Bewertung."""
+    ohne = design.snapshot(DNAZYM, 9, 15, registry=registry)
+    assert ohne.score is None and ohne.rating is None
+    assert ohne.mass is not None and ohne.tm5 is not None
+
+
+def test_thioat_hebt_die_masse_aber_nicht_den_tm(registry, stelle):
+    vorher = design.snapshot(DNAZYM, 9, 15, site=stelle, registry=registry)
+    nachher = design.snapshot(
+        design.apply_pattern(
+            DNAZYM, "arms_phosphorothioate", core_range=KERN, registry=registry
+        ).sequence,
+        9, 15, site=stelle, registry=registry,
+    )
+    # 18 Thioate, je +15,977 Da (O gegen S).
+    assert nachher.mass - vorher.mass == pytest.approx(18 * 15.977, abs=0.5)
+    assert nachher.tm5 == pytest.approx(vorher.tm5, abs=0.001)
