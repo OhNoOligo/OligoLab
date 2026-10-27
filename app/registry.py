@@ -67,6 +67,7 @@ class Registry:
         self.protecting_group_by_base: dict[str, str | None] = {}
         self.termini: dict[str, dict[str, Any]] = {}
         self.extinction: dict[str, Any] = {}
+        self.cores: list[dict[str, Any]] = []
         self.reload()
 
     # ---------------------------------------------------------------- laden
@@ -76,6 +77,7 @@ class Registry:
         self._load_modifications()
         self._load_protecting_groups()
         self._load_extinction()
+        self._load_cores()
 
     def _load_monomers(self) -> None:
         raw = _read_yaml(self._data_dir / "monomers.yaml")
@@ -172,6 +174,11 @@ class Registry:
     def _load_extinction(self) -> None:
         path = self._data_dir / "extinction.yaml"
         self.extinction = _read_yaml(path) if path.exists() else {}
+
+    def _load_cores(self) -> None:
+        """Katalytische Kerne. Reihenfolge der Datei ist die Suchreihenfolge."""
+        raw = _read_yaml(self._data_dir / "cores.yaml")
+        self.cores = list(raw.get("cores") or [])
 
     # ------------------------------------------------------------ zugreifen
 

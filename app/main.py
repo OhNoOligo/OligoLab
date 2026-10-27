@@ -24,7 +24,10 @@ from pydantic import BaseModel, Field, field_validator
 
 from app import (
     __version__,
+    critical,
+    dnazyme,
     extinction,
+    fold,
     library,
     loading,
     mass,
@@ -324,6 +327,49 @@ def profile(request: SequenceRequest) -> dict[str, Any]:
     payload["synthesis"] = consumption.as_dict()
     payload["charge_ladder"] = mass_exact.charge_ladder(exact_result.average.value)
     return payload
+
+
+class StrandRequest(SequenceRequest):
+    # Das Homodimer ist die teuerste Teilrechnung; wer nur die Karte sehen
+    # will, kann sie abschalten.
+    with_homodimer: bool = True
+
+
+@app.post("/api/strand")
+def strand(request: StrandRequest) -> dict[str, Any]:
+    """Alles, was die Seite `Strang` braucht: Bauteile, Faltung, Befunde.
+
+    Eine fehlerhafte Sequenz ist auch hier kein HTTP-Fehler, sondern Teil der
+    Antwort — die Oberflaeche soll jede unklare Stelle markieren koennen.
+    """
+    registry = get_registry()
+    oligo, problems = notation.analyse(request.sequence, registry, request.name)
+
+    payload: dict[str, Any] = {
+        "oligo": _oligo_payload(oligo),
+        "problems": [p.as_dict() for p in problems],
+    }
+
+    if problems or oligo.length == 0:
+        payload["parts"] = None
+        payload["folding"] = None
+        payload["critical"] = None
+        return payload
+
+    parts = dnazyme.detect_parts(oligo, registry)
+    folding = fold.compute(oligo, registry, with_homodimer=request.with_homodimer)
+    findings = critical.compute(oligo, parts, folding, registry)
+
+    payload["parts"] = parts.as_dict()
+    payload["folding"] = folding.as_dict()
+    payload["critical"] = findings.as_dict()
+    return payload
+
+
+@app.get("/api/cores")
+def list_cores() -> dict[str, Any]:
+    """Die katalytischen Kerne aus `data/cores.yaml`."""
+    return {"cores": [core.as_dict() for core in dnazyme.load_cores(get_registry())]}
 
 
 @app.post("/api/translate")

@@ -6,6 +6,9 @@ pydantic-settings>=2.4
 PyYAML>=6.0
 rdkit>=2024.3
 
+# Faltung, ab Phase 3
+ViennaRNA>=2.6
+
 # Ab Phase 4/5
 biopython>=1.84
 

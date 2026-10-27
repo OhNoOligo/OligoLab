@@ -384,3 +384,76 @@ def test_tests_schreiben_nicht_ins_echte_datenverzeichnis(client):
     # Geschrieben wurde in die Kopie, nicht ins Projektverzeichnis.
     assert not (REAL_DATA_DIR / "monomers_custom.yaml").exists()
     assert "TESTX" in {m["code"] for m in client.get("/api/monomers").json()["monomers"]}
+
+
+# ------------------------------------------------------------ Seite "Strang"
+
+
+def test_strand_liefert_bauteile_faltung_und_befunde(client):
+    daten = client.post("/api/strand", json={"sequence": REFERENCE_SEQUENCE}).json()
+
+    teile = daten["parts"]
+    assert teile["found"] is True
+    assert teile["core"]["id"] == "10-23"
+    assert [(p["kind"], p["start"], p["end"]) for p in teile["parts"]] == [
+        ("arm5", 1, 9),
+        ("core", 10, 24),
+        ("arm3", 25, 33),
+    ]
+
+    faltung = daten["folding"]
+    assert faltung["available"] is True
+    assert len(faltung["structure"]) == 33
+    assert len(faltung["unpaired"]) == 33
+    assert faltung["mfe"]["unit"] == "kcal/mol"
+    assert faltung["reliability"] == "Parameter vorhanden"
+
+    befunde = daten["critical"]
+    assert befunde["counts"]["kritisch"] == 0
+    assert befunde["thresholds"]["hairpin_kcal"] == -2.0
+
+
+def test_strand_meldet_lna_im_kern_als_kritisch(client):
+    """Der Testfall aus PHASEN.md, über den Endpunkt."""
+    daten = client.post(
+        "/api/strand",
+        json={"sequence": "TTGGGGTAAGGC[LNA-T]AGCTACAACGAGGTGCATGT"},
+    ).json()
+
+    kritisch = [f for f in daten["critical"]["findings"] if f["severity"] == "kritisch"]
+    assert len(kritisch) == 1
+    assert kritisch[0]["code"] == "core_modification"
+    assert kritisch[0]["start"] == 13
+    assert daten["critical"]["worst"] == "kritisch"
+    # Die Faltung läuft über das Analogon und sagt das.
+    assert daten["folding"]["reliability"] == "genähert über natürliches Analogon"
+
+
+def test_strand_rechnet_nicht_mit_fehlerhafter_sequenz(client):
+    daten = client.post("/api/strand", json={"sequence": "ACGX"}).json()
+    assert daten["problems"][0]["position"] == 4
+    assert daten["parts"] is None
+    assert daten["folding"] is None
+    assert daten["critical"] is None
+
+
+def test_strand_ohne_kern_ist_kein_fehler(client):
+    daten = client.post("/api/strand", json={"sequence": "ACACACACACAC"}).json()
+    assert daten["parts"]["found"] is False
+    assert daten["folding"]["available"] is True
+    assert any("kein katalytischer Kern" in e for e in daten["critical"]["skipped"])
+
+
+def test_homodimer_abschaltbar(client):
+    daten = client.post(
+        "/api/strand",
+        json={"sequence": REFERENCE_SEQUENCE, "with_homodimer": False},
+    ).json()
+    assert daten["folding"]["homodimer_energy"] is None
+
+
+def test_cores_endpunkt(client):
+    kerne = client.get("/api/cores").json()["cores"]
+    assert [k["id"] for k in kerne] == ["10-23"]
+    assert kerne[0]["sequence"] == "GGCTAGCTACAACGA"
+    assert kerne[0]["quelle"]

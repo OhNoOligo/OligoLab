@@ -1,0 +1,32 @@
+# OligoLab — katalytische Kerne
+#
+# Ein DNAzym besteht aus zwei Bindungsarmen und einem katalytischen Kern
+# dazwischen. Der Kern macht die Chemie; die Arme bestimmen, wo geschnitten
+# wird. Eingriffe im Kern kosten haeufig die gesamte Aktivitaet — darum
+# kennzeichnet CLAUDE.md Regel 6 ihn als besonders schuetzenswert.
+#
+# `sequence` steht in Synthi-Sprache, 5' nach 3'. Gesucht wird im Strang ueber
+# `base_parent`, damit auch modifizierte Bausteine erkannt werden.
+
+version: 1
+
+cores:
+  - id: "10-23"
+    name: "10-23"
+    sequence: "GGCTAGCTACAACGA"
+    length: 15
+    target_type: rna
+    # Spaltstellen: Purin gefolgt von Pyrimidin. Die Reihenfolge ist die der
+    # Bevorzugung; ab Phase 5 steuert sie die Bewertung der Kandidaten.
+    preferred_junctions: ["AU", "GU", "GC", "AC"]
+    metal_requirement: "Mg2+, typisch 2 bis 10 mM"
+    arm_length_default: 9
+    quelle: >
+      Santoro & Joyce, Proc Natl Acad Sci USA 94:4262 (1997) —
+      "A general purpose RNA-cleaving DNA enzyme".
+    note: >
+      Schneidet die Ziel-RNA zwischen einem Purin und einem Pyrimidin.
+      AU und GU sind gut, GC ist maessig, AC ist schlecht.
+
+# Weitere Kerne lassen sich hier anlegen. Gesucht wird in der Reihenfolge
+# dieser Liste; der erste Treffer gewinnt.
