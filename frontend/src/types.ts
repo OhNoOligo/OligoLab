@@ -627,7 +627,12 @@ export interface StructureView {
   note: string | null;
 }
 
-export type Provenance = "uebernommen" | "geruest" | "nur_zucker" | "ideal";
+export type Provenance =
+  | "uebernommen"
+  | "geruest"
+  | "nur_zucker"
+  | "gebaut"
+  | "ideal";
 
 export interface ModelPositionView {
   position: number;

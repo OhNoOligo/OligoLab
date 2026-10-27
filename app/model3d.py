@@ -10,6 +10,9 @@ Sequenz ist die eigene. Jede Position traegt deshalb mit, wie sie zustande
 kam — genau wie jede Zahl im Rest des Programms (CLAUDE.md, Regel 3):
 
     uebernommen   Base gleich, alle Atome aus der Referenz
+    gebaut        eigener Baustein: die Base wurde aus seinem SMILES in 3D
+                  gebaut (RDKit, Kraftfeld) und ueber den Zucker auf das
+                  Rueckgrat der Referenz gelegt
     geruest       Purin gegen Purin (oder Pyrimidin gegen Pyrimidin):
                   das gemeinsame Ringgeruest bleibt, die unterschiedlichen
                   Substituenten fallen weg
@@ -33,12 +36,13 @@ from app.notation import parse
 from app.pdb import Atom, Structure, atoms_of, read_text
 from app.registry import Registry, get_registry
 
-Provenance = Literal["uebernommen", "geruest", "nur_zucker", "ideal"]
+Provenance = Literal["uebernommen", "geruest", "nur_zucker", "gebaut", "ideal"]
 
 PROVENANCE_LABEL: dict[Provenance, str] = {
     "uebernommen": "aus der Referenz übernommen",
     "geruest": "Ringgerüst der Referenz, Substituenten entfernt",
     "nur_zucker": "nur Zucker und Phosphat, Base nicht modelliert",
+    "gebaut": "Base aus dem SMILES gebaut und auf das Rückgrat gelegt",
     "ideal": "ideale Rückgratspur, nicht aus der Referenz",
 }
 
@@ -46,6 +50,7 @@ PROVENANCE_RELIABILITY: dict[Provenance, Reliability] = {
     "uebernommen": Reliability.PARAMETER,
     "geruest": Reliability.APPROX,
     "nur_zucker": Reliability.APPROX,
+    "gebaut": Reliability.APPROX,
     "ideal": Reliability.APPROX,
 }
 
@@ -60,6 +65,16 @@ BACKBONE = {
 #: Das gemeinsame Ringgeruest der Purine und der Pyrimidine.
 PURINE_CORE = {"N9", "C8", "N7", "C5", "C6", "N1", "C2", "N3", "C4"}
 PYRIMIDINE_CORE = {"N1", "C2", "N3", "C4", "C5", "C6"}
+
+
+def _residue_code(code: str) -> str:
+    """Ein dreistelliger Restname fuer einen eigenen Baustein.
+
+    Das PDB-Format gibt drei Spalten her. Laengere Kuerzel werden gekuerzt —
+    der volle Code steht ohnehin an der Position im Modell.
+    """
+    sauber = "".join(zeichen for zeichen in code.upper() if zeichen.isalnum())
+    return (sauber[:3] or "UNK").rjust(3)
 
 
 def residue_name(letter: str, is_rna: bool) -> str:
@@ -296,8 +311,42 @@ def thread(
             continue
 
         alte_base = _base_letter(vorlage[0].residue)
-        behalten, herkunft = _keep_atoms(alte_base, neue_base)
-        name = residue_name(neue_base, ist_rna)
+
+        # Ein eigener Baustein hat in keiner Kristallstruktur eine Vorlage.
+        # Steht sein SMILES im Katalog, wird seine Base gebaut und ueber den
+        # Zucker auf das Rueckgrat gelegt (PHASEN.md 6.2, "Modifizierte
+        # Bausteine ueber das SMILES austauschen, ohne die
+        # Rueckgratkoordinaten anzutasten").
+        gebaut = None
+        if monomer.spec.typ not in ("dna", "rna") and monomer.spec.smiles:
+            from app import residue3d
+
+            zuckerlagen = {
+                atom.name.upper().replace("*", "'"): (atom.x, atom.y, atom.z)
+                for atom in vorlage
+                if atom.name.upper().replace("*", "'") in residue3d.SUGAR_NAMES
+            }
+            gebaut = residue3d.graft(monomer.spec.smiles, zuckerlagen)
+            if not gebaut.available:
+                warnungen.append(
+                    f"Position {monomer.position} ({monomer.spec.code}): "
+                    f"{gebaut.note}"
+                )
+                gebaut = None
+            elif gebaut.note:
+                # Eine schlecht sitzende Base darf nicht nur in der Fußnote
+                # der Position stehen — sie gehört nach oben.
+                warnungen.append(
+                    f"Position {monomer.position} ({monomer.spec.code}): {gebaut.note}"
+                )
+
+        if gebaut is not None:
+            behalten, herkunft = set(BACKBONE), "gebaut"
+        else:
+            behalten, herkunft = _keep_atoms(alte_base, neue_base)
+        name = residue_name(neue_base, ist_rna) if gebaut is None else _residue_code(
+            monomer.spec.code
+        )
 
         for atom in vorlage:
             if behalten is not None and atom.name not in behalten:
@@ -308,6 +357,16 @@ def thread(
                 _pdb_line(seriennummer, atom.name, name, kette.id, rest_nummer, atom)
             )
             seriennummer += 1
+
+        if gebaut is not None:
+            for atom_name, element, x, y, z in gebaut.atoms:
+                zeilen.append(
+                    _format_atom(
+                        "HETATM", seriennummer, atom_name, name, kette.id,
+                        rest_nummer, (x, y, z), element,
+                    )
+                )
+                seriennummer += 1
 
         positionen.append(
             ModelPosition(
@@ -320,7 +379,10 @@ def thread(
                 modification=modifikation,
                 klasse=monomer.klasse,
                 note=(
-                    None
+                    f"{len(gebaut.atoms)} Atome aus dem SMILES gebaut, "
+                    f"Zucker auf {gebaut.rmsd:.2f} Å genau gelegt"
+                    if gebaut is not None
+                    else None
                     if herkunft == "uebernommen"
                     else f"{alte_base} → {neue_base} auf der Vorlage"
                 ),
@@ -374,6 +436,13 @@ def thread(
             f"{ideal} Position(en) liegen außerhalb der Referenz. Sie haben "
             "keine Koordinaten aus der Struktur und sind im Bild nicht "
             "dargestellt."
+        )
+    gebaute = sum(1 for p in positionen if p.provenance == "gebaut")
+    if gebaute:
+        warnungen.append(
+            f"{gebaute} Base(n) wurden aus ihrem SMILES gebaut: Geometrie aus "
+            "einem Kraftfeld, Lage über den Zucker. Das Rückgrat stammt "
+            "weiterhin aus der Referenz."
         )
     nur_zucker = sum(1 for p in positionen if p.provenance == "nur_zucker")
     if nur_zucker:

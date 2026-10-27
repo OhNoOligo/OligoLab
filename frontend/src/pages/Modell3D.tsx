@@ -41,12 +41,19 @@ import type {
   StructureView,
 } from "../types";
 
-const PROVENANCE_ORDER = ["uebernommen", "geruest", "nur_zucker", "ideal"] as const;
+const PROVENANCE_ORDER = [
+  "uebernommen",
+  "geruest",
+  "nur_zucker",
+  "gebaut",
+  "ideal",
+] as const;
 
 const PROVENANCE_SHORT: Record<string, string> = {
   uebernommen: "aus der Referenz",
   geruest: "Ringgerüst",
   nur_zucker: "nur Zucker",
+  gebaut: "aus SMILES gebaut",
   ideal: "ideal",
 };
 

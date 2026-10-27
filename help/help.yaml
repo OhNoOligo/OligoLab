@@ -597,3 +597,17 @@ entries:
     short: >
       Fasst alles zum aktiven Strang auf einem Blatt zusammen, mit Datum und
       allen Einstellungen im Fuß. Das PDF schreibt der Druckdialog.
+  field.monomer_smiles:
+    title: "SMILES des Bausteins"
+    short: >
+      Das SMILES des ganzen Nukleosids — Zucker und Base, nicht die Base
+      allein. Damit kann OligoLab die Base in 3D bauen und auf das Rückgrat
+      der Referenz setzen.
+    long: >
+      Ausgerichtet wird am Zucker: der Fünfring wird im Molekül gesucht, auf
+      den Zucker der Referenzstruktur gelegt, und dieselbe Drehung trägt die
+      Base mit. Das Rückgrat bleibt das der Referenz. Die Geometrie der Base
+      stammt aus einem Kraftfeld (RDKit, ETKDG und MMFF) — sie ist gerechnet,
+      nicht gemessen, und die Position wird entsprechend gekennzeichnet.
+      Fehlt das SMILES, bleibt alles andere nutzbar; es gibt dann nur kein
+      3D-Bild dieses Bausteins.

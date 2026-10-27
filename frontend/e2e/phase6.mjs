@@ -137,13 +137,15 @@ try {
 
   // =========================================== 6.4 die Ansicht selbst
   check("das 3D-Fenster ist da", await page.getByTestId("viewer3d").count(), 1);
+  /* Auf die Leinwand warten, nicht blind zählen: 3Dmol wird erst beim
+   * Öffnen der Seite nachgeladen und legt sie danach an. */
+  await page
+    .locator('[data-testid="viewer3d"] canvas')
+    .first()
+    .waitFor({ timeout: 20000 });
   check(
     "und zeichnet auf eine Leinwand",
-    await page.evaluate(
-      () =>
-        document.querySelector('[data-testid="viewer3d"]')?.querySelectorAll("canvas")
-          .length ?? 0,
-    ),
+    await page.locator('[data-testid="viewer3d"] canvas').count(),
     1,
   );
   /* Dass eine Leinwand da ist, heißt noch nicht, dass etwas darauf steht:

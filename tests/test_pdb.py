@@ -127,7 +127,19 @@ def test_unsinnige_kennung_wird_gar_nicht_erst_abgerufen():
 
 
 def test_ohne_netz_bleibt_es_bedienbar(monkeypatch):
-    """CLAUDE.md, Regel 4: ein fehlgeschlagener Abruf ist kein Fehler."""
+    """CLAUDE.md, Regel 4: ein fehlgeschlagener Abruf ist kein Fehler.
+
+    Der Ausfall wird nachgestellt, statt wirklich nach draußen zu rufen: ein
+    Test, der am Netz hängt, prüft das Netz und nicht den Code — und er
+    liefert auf einem Rechner mit Verbindung ein anderes Ergebnis als auf
+    einem ohne.
+    """
+    import httpx
+
+    def keine_verbindung(*args, **kwargs):
+        raise httpx.ConnectError("nachgestellt")
+
+    monkeypatch.setattr(httpx.Client, "get", keine_verbindung)
     ergebnis = pdb.fetch("9ZZZ")
     assert ergebnis.available is False
     assert "nicht erreichbar" in (ergebnis.note or "")

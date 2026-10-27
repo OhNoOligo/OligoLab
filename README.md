@@ -11,6 +11,24 @@ Oberfläche, Sequenzkarte, Ziel-RNA, DNAzym-Entwurf, Geometrie und 3D.
 
 ## Inbetriebnahme
 
+**Der kurze Weg.** Linux und macOS:
+
+```bash
+./start.sh
+```
+
+Windows: `start.bat` doppelklicken.
+
+Das Skript prüft, was fehlt, legt die Python-Umgebung an, installiert die
+Pakete, baut die Oberfläche, startet den Dienst und öffnet den Browser. Beim
+ersten Mal dauert das einige Minuten, danach Sekunden. Fehlt Python oder
+Node.js, sagt es, was zu holen ist, statt mit einer Fehlermeldung abzubrechen.
+
+`./start.sh --dev` startet zusätzlich Vite mit Neuladen, `--port 8080` wählt
+einen anderen Port, `--no-browser` lässt den Browser zu.
+
+**Der ausführliche Weg**, wenn man die Schritte einzeln will:
+
 ```bash
 # Backend
 python3 -m venv .venv
@@ -44,6 +62,47 @@ es die Projektverweise übergeht.
 `.env` enthält nur Pfade zu externen Programmen (MELTING ab Phase 5, ORCA ab
 Phase 6) und keine Zugangsdaten — OligoLab braucht keine. Maschinenspezifische
 Abweichungen gehören in `.env.local`, das nicht versioniert wird.
+
+---
+
+## Einen eigenen Baustein einbauen
+
+Ein selbst entworfenes Nukleotid — etwa ein Guanin, bei dem statt des O6 ein
+Imidazolring sitzt — kommt über den Bereich **Bausteine** in den Katalog.
+Nötig ist nur ein Kürzel; alles Weitere ist freiwillig und wirkt sich darauf
+aus, was gerechnet werden kann:
+
+| Angabe | Was sie freischaltet |
+| --- | --- |
+| `code` | die Schreibweise `[ImiG]` in der Sequenz |
+| `base_parent` | Näherungen für ε₂₆₀, Tm und Faltung über das natürliche Analogon |
+| `mass_residue` | die Masse. Ohne sie bleibt sie `nicht hinterlegt` — es wird nichts geschätzt |
+| `smiles` | **die 3D-Darstellung.** Das SMILES des ganzen Nukleosids, Zucker und Base |
+| `core_tested` | ob der Eingriff im katalytischen Kern geprüft ist |
+
+Das SMILES muss das **ganze Nukleosid** beschreiben, nicht die Base allein —
+am Zucker wird ausgerichtet. Für das Beispiel oben:
+
+```
+Nc1nc2n(cnc2c(n3ccnc3)n1)[C@H]1C[C@H](O)[C@@H](CO)O1
+```
+
+Danach steht `[ImiG]` wie jeder andere Baustein in der Sequenz:
+
+```
+TTGGGGTAAGGCTA[ImiG]CTACAACGAGGTGCATGT
+```
+
+Im Bereich **3D** wird die Base dann gebaut statt übertragen: RDKit bringt
+das Nukleosid in 3D (ETKDG, danach MMFF), der Zucker wird auf den Zucker der
+Referenz gelegt, und die Drehung, die das tut, trägt die Base mit. Das
+Rückgrat bleibt dabei das der Referenz — dort wird nichts erfunden. Die
+Position trägt das Kennzeichen **„aus SMILES gebaut"**, und wie genau der
+Zucker sitzt, steht in Ångström daneben.
+
+Was damit geht: ansehen, drehen, Abstände und Winkel messen, das Fragment für
+ORCA ausschneiden. Was **nicht** geht: Tm, ΔG und Faltung kennen diesen
+Baustein weiterhin nicht und rechnen über das natürliche Analogon.
 
 ---
 
@@ -248,6 +307,7 @@ Zahl im übrigen Programm:
 | aus der Referenz | Base gleich, alle Atome übernommen |
 | Ringgerüst | Purin gegen Purin: das gemeinsame Gerüst bleibt, die unterschiedlichen Substituenten fallen weg |
 | nur Zucker | Purin gegen Pyrimidin: nur Zucker und Phosphat. Die Base wird **nicht geraten** |
+| aus SMILES gebaut | eigener Baustein: die Base aus dem SMILES in 3D gebaut (RDKit, Kraftfeld) und über den Zucker auf das Rückgrat gelegt |
 | ideal | außerhalb der Referenz, ohne gemessene Koordinaten |
 
 Ein hingeschobenes Ringatom sieht im Bild genauso aus wie ein gemessenes —

@@ -316,6 +316,18 @@ export const StructureViewer = forwardRef<StructureViewerHandle, ViewerProps>(
       bereit,
     ]);
 
+    /* Eine angeklickte Position wird herangeholt. Ohne das liegt sie
+     * irgendwo in einem Strang von dreißig Bausteinen, und man sucht genau
+     * das, was man gerade ausgewählt hat. */
+    useEffect(() => {
+      const ansicht = betrachter.current;
+      if (!bereit || !ansicht || selected === null) return;
+      const rest = nachRest.hin.get(selected);
+      if (rest === undefined) return;
+      ansicht.zoomTo({ chain: chainDnazyme, resi: rest });
+      ansicht.render();
+    }, [bereit, selected, chainDnazyme, nachRest]);
+
     if (fehler) {
       return (
         <div

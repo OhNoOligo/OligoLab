@@ -53,20 +53,23 @@ def reference_sequence() -> str:
     return REFERENCE_SEQUENCE
 
 
-#: Was im echten `data/` stehen darf. Alles andere waere ein Test, der sich
-#: ins Projektverzeichnis geschrieben hat.
-ERLAUBT_IN_DATA = {
-    "monomers.yaml",
-    "modifications.yaml",
-    "protecting_groups.yaml",
-    "extinction.yaml",
-    "cores.yaml",
-    "references.yaml",
-    "oligos.db",
-    "targets",
-    "structures",
-    "work",
-}
+#: Was im echten `data/` stand, BEVOR die Tests liefen.
+#:
+#: Eine feste Liste ginge hier nicht: wer sich einen eigenen Baustein
+#: angelegt hat, hat ein `monomers_custom.yaml` im Verzeichnis, und eine
+#: Liste wuerde ihm die ganze Testsuite rotfaerben. Gesucht wird darum
+#: nicht nach Unbekanntem, sondern nach NEUEM.
+def _bestand() -> set[str]:
+    if not REAL_DATA_DIR.exists():
+        return set()
+    return {
+        eintrag.name
+        for eintrag in REAL_DATA_DIR.iterdir()
+        if not eintrag.name.startswith(".")
+    }
+
+
+ERLAUBT_IN_DATA = _bestand()
 
 
 @pytest.fixture(autouse=True)
@@ -97,13 +100,9 @@ def data_dir(tmp_path, monkeypatch):
 
     # Die Nachkontrolle. Lieber ein lauter Test als eine stille Aenderung
     # am Projektverzeichnis.
-    fremd = sorted(
-        eintrag.name
-        for eintrag in REAL_DATA_DIR.iterdir()
-        if eintrag.name not in ERLAUBT_IN_DATA and not eintrag.name.startswith(".")
-    )
-    assert not fremd, (
-        f"Der Test hat ins echte data/ geschrieben: {fremd}. "
+    neu = sorted(_bestand() - ERLAUBT_IN_DATA)
+    assert not neu, (
+        f"Der Test hat ins echte data/ geschrieben: {neu}. "
         "Alles Schreibende gehört auf die Kopie aus der `data_dir`-Fixture."
     )
 
