@@ -1,4 +1,4 @@
-/* Die vier Bereiche, die spätere Phasen füllen.
+/* Die Bereiche, die spätere Phasen füllen.
  *
  * Phase 2 legt sie an: Navigation, Stand und Übergaben funktionieren, der
  * Inhalt kommt später. Das ist Absicht — die Wege durch das Programm lassen
@@ -98,48 +98,6 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
           }}
         />
       </div>
-    </div>
-  );
-}
-
-export function Strang({ navigate }: { navigate: (path: string) => void }) {
-  const { state, markComputed } = useStore();
-  const bereit = hasOligo(state.activeOligo?.sequence);
-
-  return (
-    <div className="flex flex-col gap-4">
-      <AreaPlaceholder
-        area="strang"
-        title="Strang"
-        phase={3}
-        what="Der Strang als Karte, mit Bauteilen, Faltung und kritischen Stellen"
-        needs={
-          <ul className="list-inside list-disc">
-            <li>Ein DNAzym. Steht in der Kopfzeile oder kommt aus dem Steckbrief.</li>
-            <li>
-              ViennaRNA für die Faltung und <code className="ol-mono">data/cores.yaml</code>{" "}
-              für den katalytischen Kern.
-            </li>
-          </ul>
-        }
-      >
-        {!bereit && (
-          <Missing>
-            Es ist kein DNAzym gesetzt. Die Sequenz gehört in die Kopfzeile oder
-            in den Steckbrief.
-          </Missing>
-        )}
-      </AreaPlaceholder>
-
-      <Handoff
-        label="Masse und MS berechnen"
-        disabled={!bereit}
-        reason="Erst ein DNAzym setzen"
-        onClick={() => {
-          markComputed("strang");
-          navigate("/");
-        }}
-      />
     </div>
   );
 }

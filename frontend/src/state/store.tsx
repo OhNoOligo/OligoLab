@@ -71,6 +71,17 @@ export interface AppState {
   /** Für den Schnellwechsler in der Kopfzeile, neueste zuerst. */
   recentOligos: OligoRef[];
   results: Partial<Record<AreaId, AreaResult>>;
+  /**
+   * Festgehaltene Stränge für die Vergleichsansicht im Bereich Strang.
+   *
+   * Gehört hierher und nicht in den Zustand der Seite: wer vergleichen will,
+   * muss die Sequenz zwischendurch ändern — und das geht nur in einem anderen
+   * Bereich. Läge die Liste in der Seite, wäre sie beim Zurückkommen leer.
+   *
+   * Gespeichert wird nur der Text. Gerechnet wird beim Anzeigen neu, damit
+   * eine geänderte Monomerdatei auch für die Varianten gilt.
+   */
+  comparison: OligoRef[];
 }
 
 export type AreaStatus = "empty" | "computed" | "stale";
@@ -98,6 +109,7 @@ const EMPTY_STATE: AppState = {
   buffer: DEFAULT_BUFFER,
   recentOligos: [],
   results: {},
+  comparison: [],
 };
 
 const MAX_RECENT = 8;
@@ -148,6 +160,8 @@ type Action =
   | { type: "patchTarget"; patch: Partial<TargetRef> }
   | { type: "patchBuffer"; patch: Partial<BufferSettings> }
   | { type: "resetBuffer" }
+  | { type: "addComparison"; oligo: OligoRef }
+  | { type: "clearComparison" }
   | { type: "markComputed"; area: AreaId }
   | { type: "clearResult"; area: AreaId }
   | { type: "hydrate"; state: AppState };
@@ -200,6 +214,19 @@ function reducer(state: AppState, action: Action): AppState {
     case "resetBuffer":
       return { ...state, buffer: DEFAULT_BUFFER };
 
+    case "addComparison": {
+      // Zwei festgehaltene plus den aktuellen Strang sind drei Karten —
+      // mehr liest niemand nebeneinander (PHASEN.md 3.4).
+      const schon = state.comparison.some(
+        (entry) => entry.sequence === action.oligo.sequence,
+      );
+      if (schon || state.comparison.length >= 2) return state;
+      return { ...state, comparison: [...state.comparison, action.oligo] };
+    }
+
+    case "clearComparison":
+      return { ...state, comparison: [] };
+
     case "markComputed":
       return {
         ...state,
@@ -237,6 +264,7 @@ function loadFromStorage(): AppState {
       buffer: { ...DEFAULT_BUFFER, ...(parsed.buffer ?? {}) },
       recentOligos: Array.isArray(parsed.recentOligos) ? parsed.recentOligos : [],
       results: parsed.results ?? {},
+      comparison: Array.isArray(parsed.comparison) ? parsed.comparison : [],
     };
   } catch {
     // Privater Modus, volle Quota, kaputter Inhalt — die App läuft trotzdem.
@@ -254,6 +282,8 @@ interface Store {
   patchTarget: (patch: Partial<TargetRef>) => void;
   patchBuffer: (patch: Partial<BufferSettings>) => void;
   resetBuffer: () => void;
+  addComparison: (oligo: OligoRef) => void;
+  clearComparison: () => void;
   markComputed: (area: AreaId) => void;
   clearResult: (area: AreaId) => void;
   statusOf: (area: AreaId) => AreaStatus;
@@ -281,6 +311,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       patchTarget: (patch) => dispatch({ type: "patchTarget", patch }),
       patchBuffer: (patch) => dispatch({ type: "patchBuffer", patch }),
       resetBuffer: () => dispatch({ type: "resetBuffer" }),
+      addComparison: (oligo) => dispatch({ type: "addComparison", oligo }),
+      clearComparison: () => dispatch({ type: "clearComparison" }),
       markComputed: (area) => dispatch({ type: "markComputed", area }),
       clearResult: (area) => dispatch({ type: "clearResult", area }),
       statusOf: (area) => areaStatus(state, area),

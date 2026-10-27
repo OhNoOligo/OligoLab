@@ -266,3 +266,95 @@ export interface HelpEntry {
   short: string;
   long?: string;
 }
+
+/* ----------------------------------------------------- Seite "Strang" */
+
+export type Severity = "kritisch" | "warnung" | "hinweis";
+
+export interface CoreSpecView {
+  id: string;
+  name: string;
+  sequence: string;
+  length: number;
+  target_type: string;
+  preferred_junctions: string[];
+  metal_requirement: string | null;
+  arm_length_default: number;
+  quelle: string | null;
+  note: string | null;
+}
+
+export interface PartView {
+  kind: "arm5" | "core" | "arm3";
+  label: string;
+  start: number;
+  end: number;
+  length: number;
+}
+
+export interface PartsView {
+  found: boolean;
+  core: CoreSpecView | null;
+  parts: PartView[];
+  approximated: string[];
+  note: string | null;
+}
+
+export interface HairpinView {
+  start: number;
+  end: number;
+  loop_start: number;
+  loop_end: number;
+  stem_length: number;
+  energy: number | null;
+}
+
+export interface FoldingView {
+  available: boolean;
+  sequence_used: string;
+  structure: string;
+  mfe: Quantity | null;
+  ensemble_energy: Quantity | null;
+  pair_probabilities: { i: number; j: number; p: number }[];
+  unpaired: number[];
+  hairpins: HairpinView[];
+  homodimer_structure: string | null;
+  homodimer_energy: Quantity | null;
+  reliability: Reliability;
+  approximated: string[];
+  note: string | null;
+}
+
+export interface FindingView {
+  code: string;
+  severity: Severity;
+  severity_label: string;
+  start: number;
+  end: number;
+  title: string;
+  message: string;
+  detail: string | null;
+}
+
+export interface CriticalView {
+  findings: FindingView[];
+  worst: Severity | null;
+  counts: Record<Severity, number>;
+  checked: string[];
+  skipped: string[];
+  thresholds: {
+    hairpin_kcal: number;
+    homodimer_kcal: number;
+    min_arm_length: number;
+    arm_imbalance: number;
+    homopolymer_run: number;
+  };
+}
+
+export interface StrandView {
+  oligo: OligoView;
+  problems: NotationProblem[];
+  parts: PartsView | null;
+  folding: FoldingView | null;
+  critical: CriticalView | null;
+}

@@ -254,6 +254,39 @@ entries:
       Rest bis zum Zielvolumen. Ein negativer Wert heißt: die Stammlösung ist
       zu verdünnt für diese Beladung.
 
+  result.findings:
+    title: "Befunde"
+    short: >
+      Kritische Stellen im Strang, nach Schweregrad sortiert. Klick hebt den
+      Bereich in der Sequenzkarte hervor; Klick auf einen Marker in der Karte
+      rollt umgekehrt zur Erklärung.
+    long: >
+      Kritisch heißt: das kostet wahrscheinlich die Aktivität. Warnung heißt:
+      das sollte man ansehen, bevor man synthetisiert. Hinweis heißt: fällt
+      auf, ist aber meist unproblematisch. Die Schwellen stehen unter der
+      Liste — sie sind nachlesbar und nicht im Code versteckt.
+  result.mfe:
+    title: "MFE-Struktur"
+    short: >
+      Die Faltung mit der niedrigsten freien Energie. Bei einem DNAzym sollte
+      sie möglichst flach sein: was in sich gefaltet ist, bindet das Ziel nicht.
+  result.ensemble:
+    title: "Ensemble-Energie"
+    short: >
+      Freie Energie über alle möglichen Strukturen, nicht nur die beste. Liegt
+      sie deutlich unter der MFE, gibt es viele ähnlich gute Faltungen — der
+      Strang hat dann keine klare Form.
+  result.homodimer:
+    title: "Homodimer"
+    short: >
+      Wie stark der Strang mit einem zweiten seiner Art paart. Was sich mit
+      seinesgleichen zusammenlegt, steht für das Ziel nicht zur Verfügung.
+  result.folding:
+    title: "Faltung"
+    short: >
+      Struktur, Energien und Paarungswahrscheinlichkeiten, gerechnet mit
+      ViennaRNA und DNA-Parametern.
+
   # ----------------------------------------------------------- Verfahren
   method.stale:
     title: "Veraltet"
@@ -277,6 +310,30 @@ entries:
       Der Weg ist Ziel → Entwurf → Strang → Steckbrief → 3D. Sequenzen werden
       dabei nicht kopiert: alle Bereiche lesen aus demselben Zustand. Was in
       der Kopfzeile steht, ist überall dasselbe.
+
+  method.dna_parameters:
+    title: "DNA-Parameter"
+    short: >
+      Ein DNAzym ist DNA, nicht RNA. Gerechnet wird darum mit den
+      DNA-Parametern nach Mathews 2004, nicht mit der Voreinstellung.
+    long: >
+      Der Unterschied ist keine Feinheit: dieselbe Haarnadel liegt mit
+      RNA-Parametern bei rund −23 kcal/mol und mit DNA-Parametern bei rund
+      −12. Daran hängt, ob sie als kritisch gilt. Modifizierte Bausteine
+      kennt ViennaRNA nicht; sie gehen über ihr natürliches Analogon ein, und
+      jedes Ergebnis, das darauf beruht, ist als genähert gekennzeichnet. Eine
+      LNA stabilisiert eine Helix erheblich — ein über das DNA-Analogon
+      gerechnetes ΔG unterschätzt das.
+  method.core:
+    title: "Katalytischer Kern"
+    short: >
+      Der Teil des DNAzyms, der die Chemie macht. Beim 10-23 sind das 15
+      Nukleotide zwischen den beiden Bindungsarmen.
+    long: >
+      Gesucht wird der Kern über das natürliche Analogon, nicht über den
+      Synthi-Buchstaben — sonst fände er sich nicht mehr, sobald eine Position
+      modifiziert ist, und genau dieser Fall soll ja gemeldet werden.
+      Eingriffe im Kern kosten häufig die gesamte Aktivität.
 
   method.reliability:
     title: "Verlässlichkeit"

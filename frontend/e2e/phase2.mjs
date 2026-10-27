@@ -14,33 +14,9 @@
  *     npm run e2e
  */
 
-import { existsSync } from "node:fs";
-import { chromium } from "playwright";
+import { BASE, createChecker, finish, openPage } from "./support.mjs";
 
-const BASE = process.env.OLIGOLAB_URL ?? "http://127.0.0.1:8000";
-
-/* Playwright sucht seinen Browser normalerweise selbst. Wo schon ein
- * Chromium liegt, das nicht zu dieser Playwright-Fassung gehoert, kann sein
- * Pfad ueber CHROMIUM_PATH mitgegeben werden — das spart einen zweiten
- * Download von einigen hundert Megabyte. */
-function launchOptions() {
-  const fromEnv = process.env.CHROMIUM_PATH;
-  if (fromEnv && existsSync(fromEnv)) return { executablePath: fromEnv };
-  return {};
-}
-
-let failed = 0;
-
-function check(label, actual, expected) {
-  const ok = JSON.stringify(actual) === JSON.stringify(expected);
-  if (!ok) failed += 1;
-  const mark = ok ? "ok  " : "FEHL";
-  console.log(`${mark} ${label}`);
-  if (!ok) {
-    console.log(`     erwartet: ${JSON.stringify(expected)}`);
-    console.log(`     bekommen: ${JSON.stringify(actual)}`);
-  }
-}
+const { check, failures } = createChecker();
 
 /** Der Stand jedes Bereichs, so wie die Seitenleiste ihn zeigt. */
 const areaStatus = (page) =>
@@ -58,14 +34,7 @@ const areaStatus = (page) =>
     return out;
   });
 
-const browser = await chromium.launch(launchOptions());
-const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
-
-const problems = [];
-page.on("pageerror", (error) => problems.push(error.message));
-page.on("console", (message) => {
-  if (message.type() === "error") problems.push(message.text());
-});
+const { browser, page, problems } = await openPage(1400, 1000);
 
 try {
   await page.goto(BASE, { waitUntil: "networkidle" });
@@ -188,5 +157,4 @@ try {
   await browser.close();
 }
 
-console.log(failed === 0 ? "\nAlle Prüfungen bestanden." : `\n${failed} fehlgeschlagen.`);
-process.exit(failed === 0 ? 0 : 1);
+finish(failures());

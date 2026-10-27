@@ -7,6 +7,8 @@
 
 import type {
   ConsumptionTable,
+  CoreSpecView,
+  StrandView,
   HelpEntry,
   LibraryOligo,
   LibrarySample,
@@ -78,6 +80,14 @@ export const api = {
       phosphorothioates: number;
       conjugates: number;
     }>("/api/summary", { sequence }),
+
+  strand: (sequence: string, withHomodimer = true) =>
+    post<StrandView>("/api/strand", {
+      sequence,
+      with_homodimer: withHomodimer,
+    }),
+
+  cores: () => request<{ cores: CoreSpecView[] }>("/api/cores"),
 
   profile: (sequence: string, name?: string, notes?: string) =>
     post<Profile>("/api/profile", { sequence, name, notes }),

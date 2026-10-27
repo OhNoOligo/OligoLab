@@ -4,8 +4,8 @@ Lokales Programm zum Rechnen und Visualisieren für modifizierte DNAzyme
 (10-23). Die Projektregeln stehen in [`CLAUDE.md`](CLAUDE.md), die
 Arbeitsschritte in [`PHASEN.md`](PHASEN.md).
 
-**Stand: Phase 2 abgeschlossen** — Massenrechner, Steckbrief, Oberfläche
-und Navigation.
+**Stand: Phase 3 abgeschlossen** — Massenrechner, Steckbrief, Oberfläche,
+Navigation und die Sequenzkarte.
 
 ---
 
@@ -28,9 +28,9 @@ dann genügt Uvicorn allein.
 Tests:
 
 ```bash
-.venv/bin/python -m pytest          # 172 Fälle
+.venv/bin/python -m pytest          # 240 Fälle
 cd frontend && npm run typecheck
-cd frontend && npm run e2e          # Abnahmetest zu Phase 2
+cd frontend && npm run e2e          # Abnahmetests zu Phase 2 und 3
 ```
 
 Der Abnahmetest fährt die gebaute Oberfläche gegen das laufende Backend. Er
@@ -54,10 +54,14 @@ Abweichungen gehören in `.env.local`, das nicht versioniert wird.
 | Beladung PAGE und LC-MS | `app/loading.py` | |
 | ε₂₆₀ und OD-Umrechnung | `app/extinction.py` | Nearest-Neighbor |
 | Bibliothek und Probenliste | `app/library.py` | SQLite, CSV-Export |
+| Bauteile erkennen | `app/dnazyme.py` | 5'-Arm, Kern, 3'-Arm über `base_parent` |
+| Faltung | `app/fold.py` | ViennaRNA mit DNA-Parametern |
+| Kritische Stellen | `app/critical.py` | acht Befunde mit Schweregrad |
 
-Die Oberfläche hat zwei gefüllte Seiten: **Steckbrief** (Sequenz, Massen,
-Reiter für Synthese, Beladung, MS und Konzentration, Bibliothek) und
-**Bausteine** (alle Konstanten ansehen, ändern, eigene anlegen).
+Die Oberfläche hat drei gefüllte Seiten: **Steckbrief** (Sequenz, Massen,
+Reiter für Synthese, Beladung, MS und Konzentration, Bibliothek), **Strang**
+(Sequenzkarte, Faltung, Befunde) und **Bausteine** (alle Konstanten ansehen,
+ändern, eigene anlegen).
 
 Die Sollwerte aus `CLAUDE.md` stehen als pytest-Fälle im Projekt und stimmen:
 alle fünf Massen auf 0,01 Da, die Verbrauchstabelle einschließlich Summe und
@@ -98,6 +102,39 @@ zeigt zwei bis drei Sätze, Klick ein Panel mit Details, Escape schließt.
 `aria-describedby` ist gesetzt, Tastatur und Finger gehen. Die Glossarseite
 `/hilfe` listet alle 49 Einträge mit Suchfeld. Weil die `data-help`-IDs schon
 in Phase 1 an jedem Feld standen, musste die Komponente nur eingehängt werden.
+
+---
+
+## Was Phase 3 kann
+
+**Bauteile erkennen.** `data/cores.yaml` hält das 10-23 mit Kernsequenz,
+Zieltyp, bevorzugten Spaltstellen, Metallionenbedarf und Quelle. Gesucht wird
+der Kern über das natürliche Analogon, nicht über den Synthi-Buchstaben: ein
+Kern, in dem eine Position durch LNA-T ersetzt wurde, ist immer noch derselbe
+Kern — und genau dieser Fall soll ja gemeldet werden. Kein Kern gefunden ist
+kein Fehler.
+
+**Faltung mit DNA-Parametern.** Der Unterschied ist keine Feinheit: dieselbe
+Haarnadel liegt mit RNA-Parametern bei −23 kcal/mol und mit DNA-Parametern bei
+−12. ViennaRNA hält den Parametersatz global, darum läuft jede Rechnung durch
+einen Kontextmanager, der hinterher wieder auf RNA stellt — sonst faltete
+Phase 4 ihre Ziel-RNA mit DNA-Parametern, ein Fehler, den niemand bemerkt,
+weil die Zahlen plausibel aussehen.
+
+**Acht Befunde** mit Bereich, Schweregrad und einem Satz Erklärung. Die
+Schwellen stehen als benannte Konstanten beieinander und gehen mit in die
+Antwort, damit die Oberfläche sagen kann, woran gemessen wurde. Wo eine
+Schwelle eine Hausregel ist und kein Literaturwert, steht das dabei.
+
+**Die Sequenzkarte** als SVG mit sechs Spuren: Positionslineal, Bausteine
+(Phosphorothioat als Punkt in der Lücke, denn dort sitzt es chemisch),
+Bauteile, Bogendiagramm der Faltung mit Strichstärke nach
+Paarungswahrscheinlichkeit, Balken für die Ungepaart-Wahrscheinlichkeit und
+die Warnspur. Zoom, Export als SVG und PNG, und eine Vergleichsansicht für bis
+zu drei Varianten, deren Karten Position für Position fluchten.
+
+Zwischen Karte und Befundliste geht es in beide Richtungen: Klick auf einen
+Befund hebt seinen Bereich hervor, Klick auf einen Marker rollt zur Erklärung.
 
 ---
 
@@ -178,11 +215,12 @@ plus n·22,99 — chemisch ein Natrium-Addukt, nicht das Salz. Gerechnet wird
 freie Säure − n·H + n·Na. Die Methode steht an jeder dieser Zahlen, ist in der
 Oberfläche sichtbar und als Test festgehalten.
 
-**Kein Plotly für das Isotopenmuster.** Fünf Balken rechtfertigen keine
-4-MB-Bibliothek. Das Diagramm ist eingebettetes SVG, erbt die Farbtoken und
-kann hell und dunkel. Die echten Diagramme der späteren Phasen
-(Bogendiagramm, Zugänglichkeitsprofil) bekommen eine Bibliothek, sobald sie
-gebraucht wird.
+**Kein Plotly, auch nicht für die Sequenzkarte.** Fünf Balken für das
+Isotopenmuster rechtfertigten keine 4-MB-Bibliothek, und die Sequenzkarte
+schreibt PHASEN.md ohnehin als SVG vor. Beides ist eingebettetes SVG, erbt die
+Farbtoken und kann hell und dunkel. Für den Export werden die CSS-Variablen
+durch ihre errechneten Werte ersetzt — eine herausgelöste Datei wäre sonst
+farblos.
 
 **Nur `data-help`-Attribute, noch keine Fragezeichen-Hilfe** — erledigt in
 Phase 2.
@@ -220,6 +258,5 @@ dort soll aus derselben Quelle kommen wie im Steckbrief.
 
 ## Nächster Schritt
 
-Phase 3 — Den Strang sichtbar machen (`PHASEN.md`, Abschnitt 3): Bauteile
-erkennen, Faltung mit ViennaRNA, kritische Stellen und die Sequenzkarte als
-SVG.
+Phase 4 — Die Ziel-RNA (`PHASEN.md`, Abschnitt 4): Zielsequenz eingeben oder
+aus Ensembl, NCBI und RNAcentral holen, falten, Zugänglichkeitsprofil.
