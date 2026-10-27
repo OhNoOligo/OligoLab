@@ -74,6 +74,29 @@ def dna_parameters() -> Iterator[None]:
             _RNA.params_load_RNA_Turner2004()
 
 
+@contextmanager
+def rna_parameters() -> Iterator[None]:
+    """RNA-Parameter fuer die Dauer des Blocks.
+
+    Der Standardsatz ist ohnehin RNA, dieser Block sagt es aber ausdruecklich.
+    Sich darauf zu verlassen, dass der globale Zustand "zufaellig schon
+    richtig" ist, waere genau die Nachlaessigkeit, gegen die
+    `dna_parameters()` gebaut wurde — nur in die andere Richtung.
+    """
+    global _dna_depth
+    if not VIENNA_AVAILABLE:
+        raise RuntimeError("ViennaRNA ist nicht installiert.")
+    vorher = _dna_depth
+    _dna_depth = 0
+    _RNA.params_load_RNA_Turner2004()
+    try:
+        yield
+    finally:
+        _dna_depth = vorher
+        if vorher > 0:
+            _RNA.params_load_DNA_Mathews2004()
+
+
 def pairs_from_structure(structure: str) -> dict[int, int]:
     """Klammerstruktur in Paare {i: j} und {j: i}, 1-basiert.
 

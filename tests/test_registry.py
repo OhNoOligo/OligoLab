@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
-
 import pytest
 
 from app.registry import (
@@ -18,16 +16,9 @@ from app.registry import (
 
 
 @pytest.fixture
-def datenverzeichnis(tmp_path):
-    """Eine Kopie von `data/`, damit die Tests nicht in die echten Dateien schreiben."""
-    for name in (
-        "monomers.yaml",
-        "protecting_groups.yaml",
-        "modifications.yaml",
-        "extinction.yaml",
-    ):
-        shutil.copy(f"data/{name}", tmp_path / name)
-    return tmp_path
+def datenverzeichnis(data_dir):
+    """Die Kopie aus der gemeinsamen Fixture."""
+    return data_dir
 
 
 def test_excel_konstanten_stimmen_mit_der_datei(registry):

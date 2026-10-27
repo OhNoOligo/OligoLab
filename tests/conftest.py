@@ -36,10 +36,16 @@ REFERENCE_CONSUMPTION_TOTAL = 160.6
 REFERENCE_CONSUMPTION_TOTAL_RESERVE = 176.6
 
 
-@pytest.fixture(scope="session")
-def registry() -> Registry:
-    """Die echten YAML-Kataloge aus `data/`."""
-    return Registry()
+@pytest.fixture
+def registry(data_dir) -> Registry:
+    """Die Kataloge — auf einer Kopie, nie auf dem echten `data/`.
+
+    Bewusst NICHT session-weit: eine einmal gebaute Registry haelt ihr
+    Verzeichnis fest und haette die Umlenkung je Test ueberlebt. Genau daran
+    ist einmal ein Test ins echte Projektverzeichnis durchgeschlagen und hat
+    dort einen Baustein veraendert.
+    """
+    return Registry(data_dir)
 
 
 @pytest.fixture
@@ -47,19 +53,36 @@ def reference_sequence() -> str:
     return REFERENCE_SEQUENCE
 
 
+#: Was im echten `data/` stehen darf. Alles andere waere ein Test, der sich
+#: ins Projektverzeichnis geschrieben hat.
+ERLAUBT_IN_DATA = {
+    "monomers.yaml",
+    "modifications.yaml",
+    "protecting_groups.yaml",
+    "extinction.yaml",
+    "cores.yaml",
+    "references.yaml",
+    "oligos.db",
+    "targets",
+    "structures",
+    "work",
+}
+
+
 @pytest.fixture(autouse=True)
-def _isolated_data_dir(tmp_path, monkeypatch):
+def data_dir(tmp_path, monkeypatch):
     """Jeder Test arbeitet auf einer Kopie von `data/`.
 
     Ohne das schreiben Tests, die einen eigenen Baustein anlegen, in die
-    echte `data/monomers_custom.yaml` des Nutzers — und landen beim naechsten
-    Commit mit im Repository. Genau das ist einmal passiert.
+    echte `data/monomers_custom.yaml` — und landen beim naechsten Commit mit
+    im Repository. Das ist zweimal passiert, darum prueft die Fixture am Ende
+    nach.
     """
     from app import registry as registry_module
     from app.config import settings
 
     kopie = tmp_path / "data"
-    kopie.mkdir()
+    (kopie / "targets").mkdir(parents=True)
     for datei in REAL_DATA_DIR.glob("*.yaml"):
         shutil.copy(datei, kopie / datei.name)
 
@@ -67,8 +90,22 @@ def _isolated_data_dir(tmp_path, monkeypatch):
     # Die gemeinsame Registry haelt ihr Verzeichnis seit dem ersten Zugriff
     # fest; sie muss neu gebaut werden, sonst greift die Umlenkung nicht.
     monkeypatch.setattr(registry_module, "_registry", None)
-    yield
+
+    yield kopie
+
     monkeypatch.setattr(registry_module, "_registry", None)
+
+    # Die Nachkontrolle. Lieber ein lauter Test als eine stille Aenderung
+    # am Projektverzeichnis.
+    fremd = sorted(
+        eintrag.name
+        for eintrag in REAL_DATA_DIR.iterdir()
+        if eintrag.name not in ERLAUBT_IN_DATA and not eintrag.name.startswith(".")
+    )
+    assert not fremd, (
+        f"Der Test hat ins echte data/ geschrieben: {fremd}. "
+        "Alles Schreibende gehört auf die Kopie aus der `data_dir`-Fixture."
+    )
 
 
 @pytest.fixture(autouse=True)

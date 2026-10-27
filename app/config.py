@@ -38,6 +38,19 @@ class Settings(BaseSettings):
     coupling_volume_ml: float = 0.12
     reserve_fraction: float = 0.10
 
+    # Optionale Sequenzabrufe (PHASEN.md 4.1). Alles davon ist freiwillig:
+    # ohne Netz bleibt OligoLab voll bedienbar.
+    ensembl_url: str = "https://rest.ensembl.org"
+    ncbi_url: str = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+    rnacentral_url: str = "https://rnacentral.org/api/v1"
+    network_timeout_s: float = 15.0
+
+    # NCBI bittet darum, bei Abrufen eine Kennmail mitzuschicken, um bei
+    # Problemen jemanden erreichen zu koennen. Leer heisst: wird nicht
+    # mitgeschickt. Die Adresse wird nicht erraten — wer sie mitschicken
+    # will, traegt sie in die `.env` ein.
+    ncbi_email: str = ""
+
     @property
     def monomers_path(self) -> Path:
         return self.data_dir / "monomers.yaml"

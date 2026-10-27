@@ -53,6 +53,31 @@ class SampleRecord(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_now)
 
 
+class TargetRecord(SQLModel, table=True):
+    """Eine gespeicherte Ziel-RNA (PHASEN.md 4.1).
+
+    Name, Quelle, Kennung und Abrufdatum gehoeren dazu: ohne sie weiss
+    spaeter niemand mehr, woher eine Sequenz kam — und bei einem Ziel, auf
+    das ein ganzes DNAzym entworfen wurde, ist das die wichtigste Angabe.
+    """
+
+    __tablename__ = "targets"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    sequence: str
+    source: str = "Direkteingabe"
+    identifier: str | None = None
+    organism: str | None = None
+    description: str | None = None
+    #: Die Abschnitte als JSON, damit die Tabelle flach bleibt.
+    regions_json: str | None = None
+    length: int = 0
+    fetched_at: str | None = None
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
 _engine: Engine | None = None
 
 
@@ -239,6 +264,83 @@ def list_samples(limit: int = 500) -> list[SampleRecord]:
 def delete_sample(record_id: int) -> bool:
     with session() as s:
         record = s.get(SampleRecord, record_id)
+        if record is None:
+            return False
+        s.delete(record)
+        s.commit()
+        return True
+
+
+# ------------------------------------------------------------- Zielsequenzen
+
+
+def save_target(
+    name: str,
+    sequence: str,
+    source: str = "Direkteingabe",
+    identifier: str | None = None,
+    organism: str | None = None,
+    description: str | None = None,
+    regions_json: str | None = None,
+    fetched_at: str | None = None,
+) -> TargetRecord:
+    """Anlegen oder, bei gleichem Namen, aktualisieren."""
+    with session() as s:
+        existing = s.exec(select(TargetRecord).where(TargetRecord.name == name)).first()
+        record = existing or TargetRecord(name=name, sequence=sequence)
+        record.sequence = sequence
+        record.source = source
+        record.identifier = identifier
+        record.organism = organism
+        record.description = description
+        record.regions_json = regions_json
+        record.fetched_at = fetched_at
+        record.length = len(sequence)
+        record.updated_at = _now()
+        s.add(record)
+        s.commit()
+        s.refresh(record)
+        return record
+
+
+def list_targets(query: str | None = None, limit: int = 500) -> list[TargetRecord]:
+    """Alle Ziele, optional durchsucht. Gefiltert wird in SQL, nicht danach."""
+    with session() as s:
+        statement = select(TargetRecord)
+        if query and query.strip():
+            pattern = _like_pattern(query)
+            statement = statement.where(
+                col(TargetRecord.name).ilike(pattern, escape="\\")
+                | col(TargetRecord.identifier).ilike(pattern, escape="\\")
+                | col(TargetRecord.description).ilike(pattern, escape="\\")
+                | col(TargetRecord.organism).ilike(pattern, escape="\\")
+            )
+        statement = statement.order_by(TargetRecord.updated_at.desc()).limit(limit)
+        return list(s.exec(statement))
+
+
+def count_targets(query: str | None = None) -> int:
+    with session() as s:
+        statement = select(func.count()).select_from(TargetRecord)
+        if query and query.strip():
+            pattern = _like_pattern(query)
+            statement = statement.where(
+                col(TargetRecord.name).ilike(pattern, escape="\\")
+                | col(TargetRecord.identifier).ilike(pattern, escape="\\")
+                | col(TargetRecord.description).ilike(pattern, escape="\\")
+                | col(TargetRecord.organism).ilike(pattern, escape="\\")
+            )
+        return int(s.exec(statement).one())
+
+
+def get_target(record_id: int) -> TargetRecord | None:
+    with session() as s:
+        return s.get(TargetRecord, record_id)
+
+
+def delete_target(record_id: int) -> bool:
+    with session() as s:
+        record = s.get(TargetRecord, record_id)
         if record is None:
             return False
         s.delete(record)

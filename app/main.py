@@ -34,7 +34,9 @@ from app import (
     mass_exact,
     notation,
     synthesis,
+    target as target_module,
 )
+from app import fold_target
 from app.config import PROJECT_ROOT, settings
 from app.registry import (
     get_registry,
@@ -364,6 +366,207 @@ def strand(request: StrandRequest) -> dict[str, Any]:
     payload["folding"] = folding.as_dict()
     payload["critical"] = findings.as_dict()
     return payload
+
+
+class TargetTextRequest(BaseModel):
+    text: str
+    name: str | None = None
+    format: Literal["auto", "plain", "fasta", "genbank"] = "auto"
+
+
+class TargetFetchRequest(BaseModel):
+    source: Literal["ensembl", "ncbi", "rnacentral"]
+    identifier: str
+    species: str = "homo_sapiens"
+
+
+class TargetFoldRequest(BaseModel):
+    sequence: str
+    start: int | None = Field(default=None, ge=1)
+    end: int | None = Field(default=None, ge=1)
+
+
+class AccessibilityRequest(TargetFoldRequest):
+    probe_length: int = Field(default=fold_target.DEFAULT_PROBE_LENGTH, ge=1, le=200)
+    window: int = Field(default=fold_target.DEFAULT_WINDOW, ge=2, le=2000)
+    max_span: int = Field(default=fold_target.DEFAULT_MAX_SPAN, ge=2, le=2000)
+
+
+class UpRequest(BaseModel):
+    target_sequence: str
+    site_start: int = Field(ge=1)
+    site_end: int = Field(ge=1)
+    oligo_sequence: str
+    temperature_c: float = 37.0
+
+
+class TargetSaveRequest(BaseModel):
+    name: str
+    sequence: str
+    source: str = "Direkteingabe"
+    identifier: str | None = None
+    organism: str | None = None
+    description: str | None = None
+    regions: list[dict[str, Any]] = Field(default_factory=list)
+    fetched_at: str | None = None
+
+    _check_name = field_validator("name")(_require_name)
+
+
+@app.post("/api/target/read")
+def target_read(request: TargetTextRequest) -> dict[str, Any]:
+    """Text als Zielsequenz einlesen.
+
+    `auto` erkennt FASTA am `>` und GenBank am `LOCUS`. Ein unbekanntes
+    Zeichen ist ein Fehler mit Positionsangabe (CLAUDE.md, Regel 5).
+    """
+    text = request.text
+    fmt = request.format
+    if fmt == "auto":
+        gestrafft = text.lstrip()
+        if gestrafft.startswith(">"):
+            fmt = "fasta"
+        elif gestrafft.startswith("LOCUS"):
+            fmt = "genbank"
+        else:
+            fmt = "plain"
+
+    try:
+        if fmt == "fasta":
+            result = target_module.from_fasta(text, request.name)
+        elif fmt == "genbank":
+            result = target_module.from_genbank(text, request.name)
+        else:
+            result = target_module.from_text(text, request.name or "Direkteingabe")
+    except target_module.TargetError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": str(error),
+                "position": error.position,
+                "character": error.character,
+            },
+        ) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    return {"target": result.as_dict(), "detected_format": fmt}
+
+
+@app.post("/api/target/fetch")
+def target_fetch(request: TargetFetchRequest) -> dict[str, Any]:
+    """Aus Ensembl, NCBI oder RNAcentral holen.
+
+    Ein fehlgeschlagener Abruf ist kein HTTP-Fehler: OligoLab bleibt ohne
+    Netz voll bedienbar, und die Antwort sagt das ruhig (CLAUDE.md, Regel 4).
+    """
+    if request.source == "ensembl":
+        result = target_module.fetch_ensembl(request.identifier, request.species)
+    elif request.source == "ncbi":
+        result = target_module.fetch_ncbi(request.identifier)
+    else:
+        result = target_module.fetch_rnacentral(request.identifier)
+    return result.as_dict()
+
+
+@app.post("/api/target/fold")
+def target_fold(request: TargetFoldRequest) -> dict[str, Any]:
+    try:
+        sequence = target_module.normalise(request.sequence)
+    except target_module.TargetError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return fold_target.fold_region(sequence, request.start, request.end).as_dict()
+
+
+@app.post("/api/target/accessibility")
+def target_accessibility(request: AccessibilityRequest) -> dict[str, Any]:
+    try:
+        sequence = target_module.normalise(request.sequence)
+    except target_module.TargetError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    try:
+        return fold_target.accessibility(
+            sequence,
+            start=request.start,
+            end=request.end,
+            probe_length=request.probe_length,
+            window=request.window,
+            max_span=request.max_span,
+        ).as_dict()
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/target/up")
+def target_up(request: UpRequest) -> dict[str, Any]:
+    try:
+        sequence = target_module.normalise(request.target_sequence)
+    except target_module.TargetError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    try:
+        return fold_target.rnaup(
+            sequence,
+            request.site_start,
+            request.site_end,
+            request.oligo_sequence,
+            request.temperature_c,
+        ).as_dict()
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/library/targets")
+def targets_list(q: str | None = Query(default=None)) -> dict[str, Any]:
+    import json as _json
+
+    return {
+        "total": library.count_targets(q),
+        "targets": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "sequence": r.sequence,
+                "length": r.length,
+                "source": r.source,
+                "identifier": r.identifier,
+                "organism": r.organism,
+                "description": r.description,
+                "regions": _json.loads(r.regions_json) if r.regions_json else [],
+                "fetched_at": r.fetched_at,
+                "updated_at": r.updated_at.isoformat(timespec="seconds"),
+            }
+            for r in library.list_targets(q)
+        ],
+    }
+
+
+@app.post("/api/library/targets")
+def targets_save(request: TargetSaveRequest) -> dict[str, Any]:
+    import json as _json
+
+    try:
+        sequence = target_module.normalise(request.sequence)
+    except target_module.TargetError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    record = library.save_target(
+        name=request.name,
+        sequence=sequence,
+        source=request.source,
+        identifier=request.identifier,
+        organism=request.organism,
+        description=request.description,
+        regions_json=_json.dumps(request.regions) if request.regions else None,
+        fetched_at=request.fetched_at,
+    )
+    return {"id": record.id, "name": record.name}
+
+
+@app.delete("/api/library/targets/{record_id}")
+def targets_delete(record_id: int) -> dict[str, Any]:
+    if not library.delete_target(record_id):
+        raise HTTPException(status_code=404, detail="Ziel nicht gefunden.")
+    return {"deleted": record_id}
 
 
 @app.get("/api/cores")

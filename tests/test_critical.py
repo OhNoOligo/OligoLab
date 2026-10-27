@@ -347,7 +347,7 @@ def test_haarnadel_ueber_die_volle_laenge_bleibt_region(registry):
     assert (treffer[0].start, treffer[0].end) == (1, 22)
 
 
-def test_core_tested_entscheidet_allein(registry, tmp_path, monkeypatch):
+def test_core_tested_entscheidet_allein(registry, data_dir):
     """Auch ein unmodifizierter Baustein wird gemeldet, wenn er auf `nein` steht.
 
     Vorher wurde unmodifizierte DNA nie geprüft. Ein Baustein, den jemand in
@@ -356,9 +356,10 @@ def test_core_tested_entscheidet_allein(registry, tmp_path, monkeypatch):
     """
     from app.registry import Registry, save_monomer
 
-    # dT im Kern ausdrücklich als untauglich markieren.
-    save_monomer({"code": "T", "core_tested": "nein"}, registry._data_dir)
-    eigene = Registry(registry._data_dir)
+    # dT im Kern ausdrücklich als untauglich markieren. Geschrieben wird auf
+    # die Kopie aus der Fixture, nie ins Projektverzeichnis.
+    save_monomer({"code": "T", "core_tested": "nein"}, data_dir)
+    eigene = Registry(data_dir)
 
     oligo = parse(REFERENCE_SEQUENCE, eigene)
     teile = detect_parts(oligo, eigene)

@@ -457,3 +457,125 @@ def test_cores_endpunkt(client):
     assert [k["id"] for k in kerne] == ["10-23"]
     assert kerne[0]["sequence"] == "GGCTAGCTACAACGA"
     assert kerne[0]["quelle"]
+
+
+# ------------------------------------------------------------ Seite "Ziel"
+
+
+def test_target_read_erkennt_das_format(client):
+    """`auto` erkennt FASTA am `>`, GenBank am `LOCUS`, sonst Rohtext."""
+    rein = client.post("/api/target/read", json={"text": "ACGT ACGT"}).json()
+    assert rein["detected_format"] == "plain"
+    assert rein["target"]["sequence"] == "ACGUACGU"
+
+    fasta = client.post(
+        "/api/target/read", json={"text": ">NM_1 Beschreibung\nACGTACGT\n"}
+    ).json()
+    assert fasta["detected_format"] == "fasta"
+    assert fasta["target"]["identifier"] == "NM_1"
+
+
+def test_target_read_meldet_unbekanntes_zeichen_mit_position(client):
+    antwort = client.post("/api/target/read", json={"text": "ACGXT"})
+    assert antwort.status_code == 422
+    assert antwort.json()["detail"]["position"] == 4
+    assert antwort.json()["detail"]["character"] == "X"
+
+
+def test_target_fetch_ohne_netz_ist_kein_http_fehler(client, monkeypatch):
+    """CLAUDE.md, Regel 4: ohne Netz bleibt die App voll bedienbar."""
+    import httpx
+
+    monkeypatch.setattr(
+        httpx.Client, "get",
+        lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("kein Netz")),
+    )
+    antwort = client.post(
+        "/api/target/fetch", json={"source": "ensembl", "identifier": "TP53"}
+    )
+    assert antwort.status_code == 200
+    daten = antwort.json()
+    assert daten["available"] is False
+    assert "nicht erreichbar" in daten["message"]
+
+
+def test_target_fold_und_accessibility(client):
+    sequenz = "AAAAAAAAAAAAAAAAAAAAAAAAAA" + "GGGGGCCCCUUUUGGGGCCCCC"
+
+    faltung = client.post("/api/target/fold", json={"sequence": sequenz}).json()
+    assert faltung["available"] is True
+    assert faltung["mfe"]["unit"] == "kcal/mol"
+    assert "RNA-Parametern" in faltung["mfe"]["method"]
+
+    profil = client.post(
+        "/api/target/accessibility",
+        json={"sequence": sequenz, "probe_length": 10},
+    ).json()
+    assert profil["available"] is True
+    assert len(profil["profile"]) == len(sequenz)
+    assert profil["profile"][0] > 0.9          # offener Anfang
+    assert profil["profile"][30] < 0.05        # im Stamm
+    assert profil["profile"][-1] is None       # kein volles Fenster mehr
+    assert "Fensteranfang" in profil["method"]
+
+
+def test_accessibility_weist_unsinnige_einstellungen_ab(client):
+    antwort = client.post(
+        "/api/target/accessibility",
+        json={"sequence": "ACGUACGU", "probe_length": 50, "window": 10},
+    )
+    assert antwort.status_code == 422
+
+
+def test_target_up(client):
+    sequenz = "AAAAAAAAAAAAAAAAAAAAAAAAAA" + "GGGGGCCCCUUUUGGGGCCCCC"
+    daten = client.post(
+        "/api/target/up",
+        json={
+            "target_sequence": sequenz,
+            "site_start": 1,
+            "site_end": 10,
+            "oligo_sequence": "TTTTTTTTTT",
+        },
+    ).json()
+    assert daten["available"] is True
+    assert daten["hybridisation"]["value"] < 0
+    # Der Vorbehalt steht an jeder Zahl.
+    assert "MELTING" in daten["hybridisation"]["note"]
+
+
+def test_zielbibliothek(client):
+    angelegt = client.post(
+        "/api/library/targets",
+        json={
+            "name": "TP53 Transkript",
+            "sequence": "ACGTACGT",
+            "source": "ncbi",
+            "identifier": "NM_000546",
+            "organism": "Homo sapiens",
+            "regions": [{"kind": "cds", "start": 1, "end": 8, "label": "CDS"}],
+        },
+    )
+    assert angelegt.status_code == 200
+    record_id = angelegt.json()["id"]
+
+    liste = client.get("/api/library/targets").json()
+    assert liste["total"] == 1
+    eintrag = liste["targets"][0]
+    # Beim Speichern wird normalisiert: T wird zu U.
+    assert eintrag["sequence"] == "ACGUACGU"
+    assert eintrag["identifier"] == "NM_000546"
+    assert eintrag["regions"][0]["kind"] == "cds"
+
+    assert client.get("/api/library/targets", params={"q": "NM_000"}).json()["total"] == 1
+    assert client.get("/api/library/targets", params={"q": "nix"}).json()["total"] == 0
+
+    assert client.delete(f"/api/library/targets/{record_id}").status_code == 200
+    assert client.delete(f"/api/library/targets/{record_id}").status_code == 404
+
+
+def test_ziel_ohne_namen_wird_abgewiesen(client):
+    antwort = client.post(
+        "/api/library/targets", json={"name": "  ", "sequence": "ACGU"}
+    )
+    assert antwort.status_code == 422
