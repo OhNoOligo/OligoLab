@@ -462,3 +462,34 @@ def test_thioat_hebt_die_masse_aber_nicht_den_tm(registry, stelle):
     # 18 Thioate, je +15,977 Da (O gegen S).
     assert nachher.mass - vorher.mass == pytest.approx(18 * 15.977, abs=0.5)
     assert nachher.tm5 == pytest.approx(vorher.tm5, abs=0.001)
+
+
+# ======================================= Regression: der Kernschutz greift
+#
+# Vorher hing der Schutz daran, dass der Aufrufer `core_range` mitschickte.
+# Wer es vergaß, veränderte den Kern stillschweigend — genau das, was
+# CLAUDE.md, Regel 6 verbietet.
+
+
+def test_kern_wird_auch_ohne_angabe_geschuetzt(registry):
+    ergebnis = design.apply_pattern(
+        DNAZYM, "replace_position", position=13, code="LNA", registry=registry
+    )
+    assert ergebnis.blocked is True
+    assert ergebnis.sequence == DNAZYM
+    assert "katalytischen Kern" in (ergebnis.message or "")
+
+
+def test_muster_greifen_ohne_angabe_nicht_in_den_kern(registry):
+    """Auch ein Muster mit zu großer Reichweite bleibt in den Armen."""
+    ergebnis = design.apply_pattern(DNAZYM, "lna_ends", count=20, registry=registry)
+    assert ergebnis.touched_core is False
+    kern_positionen = {c.position for c in ergebnis.changes if c.position}
+    assert kern_positionen.isdisjoint(range(10, 25))
+
+
+def test_strang_ohne_kern_sagt_es(registry):
+    """Kein Kern ist kein Fehler — aber es muss dastehen."""
+    ergebnis = design.apply_pattern("ACGTACGTACGT", "lna_ends", count=2, registry=registry)
+    assert ergebnis.blocked is False
+    assert "kein katalytischer Kern" in (ergebnis.message or "")

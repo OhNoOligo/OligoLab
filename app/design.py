@@ -689,9 +689,23 @@ def apply_pattern(
     from app.models import Conjugate, Linkage, Monomer
     from app.notation import to_string
 
+    from app import dnazyme
+
     reg = registry or get_registry()
     oligo = parse(sequence, reg)
     laenge = oligo.length
+
+    # Schickt der Aufrufer keinen Kern mit, wird er GESUCHT — nicht
+    # angenommen, es gebe keinen. Sonst haette ein vergessener Parameter
+    # stillschweigend den Kern freigegeben, und genau das verbietet
+    # CLAUDE.md, Regel 6. Findet sich keiner, steht das in der Antwort.
+    kern_gefunden = core_range is not None
+    if core_range is None:
+        teile = dnazyme.detect_parts(oligo, reg)
+        gefunden = teile.core_part
+        if gefunden is not None:
+            core_range = (gefunden.start, gefunden.end)
+            kern_gefunden = True
 
     def im_kern(pos: int) -> bool:
         return core_range is not None and core_range[0] <= pos <= core_range[1]
@@ -838,6 +852,12 @@ def apply_pattern(
                 "blieb unangetastet. Eingriffe dort verlangen eine ausdrückliche "
                 "Bestätigung."
             )
+    if not kern_gefunden and pattern != "galnac_5prime":
+        hinweis = (
+            "In diesem Strang wurde kein katalytischer Kern gefunden — die "
+            "Änderungen liefen ohne Kernschutz."
+        )
+        nachricht = f"{nachricht} {hinweis}" if nachricht else hinweis
     if kern_beruehrt:
         nachricht = (
             f"ACHTUNG: {sum(1 for c in aenderungen if c.in_core)} Änderung(en) "

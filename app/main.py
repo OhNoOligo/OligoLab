@@ -672,7 +672,13 @@ def scan_route(request: ScanRequest) -> dict[str, Any]:
 def _design(request: DesignRequest) -> tuple[Any, Any, Any, str]:
     sequence = _normalised_target(request.sequence)
     einstellungen = request.settings.to_settings()
-    einstellungen.include_poor_junctions = request.include_poor
+    # Dieselbe Sache steht an zwei Stellen in der Anfrage. Eines davon
+    # stillschweigend zu uebergehen hiesse, eine gesetzte Einstellung zu
+    # verwerfen — darum gilt sie, sobald eine der beiden sie setzt.
+    schlechte_mitnehmen = (
+        request.include_poor or request.settings.include_poor_junctions
+    )
+    einstellungen.include_poor_junctions = schlechte_mitnehmen
     try:
         faltung, profil = _structure_for(sequence, request)
     except ValueError as error:
@@ -683,7 +689,7 @@ def _design(request: DesignRequest) -> tuple[Any, Any, Any, str]:
         end=request.end,
         folding=faltung,
         accessibility=profil,
-        include_poor=request.include_poor,
+        include_poor=schlechte_mitnehmen,
     )
     ergebnis = design_module.design(
         sequence,

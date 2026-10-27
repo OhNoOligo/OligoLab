@@ -762,3 +762,33 @@ def test_musterliste(client):
     assert "arms_phosphorothioate" in kennungen
     assert "lna_ends" in kennungen
     assert daten["disclaimer"]
+
+
+def test_kernschutz_auch_ohne_mitgeschickten_kern(client):
+    """Regression: ein vergessener Parameter gab den Kern nicht frei."""
+    antwort = client.post(
+        "/api/modify",
+        json={
+            "sequence": DNAZYM,
+            "pattern": "replace_position",
+            "position": 13,
+            "code": "LNA",
+        },
+    )
+    daten = antwort.json()["modification"]
+    assert daten["blocked"] is True
+    assert daten["sequence"] == DNAZYM
+
+
+def test_schlechte_junktionen_auch_ueber_die_einstellungen(client):
+    """Regression: `settings.include_poor_junctions` wurde überschrieben."""
+    daten = client.post(
+        "/api/design",
+        json={
+            "sequence": ZIEL,
+            "with_structure": False,
+            "settings": {"include_poor_junctions": True},
+        },
+    ).json()
+    assert daten["settings"]["include_poor_junctions"] is True
+    assert daten["scan"]["hidden_poor"] == 0

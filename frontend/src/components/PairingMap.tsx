@@ -94,24 +94,35 @@ export function PairingMap({
 
     const x = (index: number) => GUTTER + index * CELL + CELL / 2;
 
-    // Ersatzmonomere, solange `/api/strand` noch nicht geantwortet hat.
+    /* Ersatzmonomere, solange `/api/strand` noch nicht geantwortet hat.
+     *
+     * Die Buchstaben kommen aus Arm, Kern und Arm — NICHT aus dem
+     * Sequenztext: der hat bei `[LNA-T]` sieben Zeichen statt einem, und
+     * das Bild bekäme Klammern in die Zellen (CLAUDE.md, Regel 1). */
     const list: MonomerView[] =
       monomers && monomers.length === n5 + nc + n3
         ? monomers
-        : candidate.sequence.split("").map((code, index) => ({
-            position: index + 1,
-            code,
-            source: code,
-            name: code,
-            typ: "dna",
-            klasse: "dna",
-            base_parent: code,
-            core_tested: "unbekannt",
-            modifications: [],
-            mass_residue: { value: 0, unit: "g/mol", reliability: "exakt", method: "" },
-            span: { start: index + 1, end: index + 1 },
-            deviates_from_excel: false,
-          })) as unknown as MonomerView[];
+        : ((candidate.arm5 + candidate.core + candidate.arm3)
+            .split("")
+            .map((code, index) => ({
+              position: index + 1,
+              code,
+              source: code,
+              name: code,
+              typ: "dna",
+              klasse: "dna",
+              base_parent: code,
+              core_tested: "unbekannt",
+              modifications: [],
+              mass_residue: {
+                value: 0,
+                unit: "g/mol",
+                reliability: "exakt",
+                method: "",
+              },
+              span: { start: index + 1, end: index + 1 },
+              deviates_from_excel: false,
+            })) as unknown as MonomerView[]);
 
     const arms: Placed[] = [];
     const core: { monomer: MonomerView; x: number; y: number }[] = [];
@@ -119,7 +130,12 @@ export function PairingMap({
     // 5'-Arm: Monomer k paart stromab[n5 - k] (0-basiert).
     for (let k = 1; k <= n5; k += 1) {
       const targetIndex = cut + (n5 - k);
-      arms.push({ monomer: list[k - 1], x: x(targetIndex), y: Y_STRAND, targetIndex });
+      arms.push({
+        monomer: list[k - 1],
+        x: x(targetIndex),
+        y: Y_STRAND,
+        targetIndex,
+      });
     }
     // 3'-Arm: Monomer k paart stromauf[n3 - k].
     for (let k = 1; k <= n3; k += 1) {
@@ -199,9 +215,9 @@ export function PairingMap({
     <figure className="m-0">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <figcaption className="text-xs" style={{ color: "var(--text-faint)" }}>
-          Ziel-RNA oben in 5'→3'. Das DNAzym darunter läuft gegenläufig —
-          links sein 3'-Ende. Der Kern bindet nicht und steht als Schleife
-          über der Schnittstelle.
+          Ziel-RNA oben in 5'→3'. Das DNAzym darunter läuft gegenläufig — links
+          sein 3'-Ende. Der Kern bindet nicht und steht als Schleife über der
+          Schnittstelle.
         </figcaption>
         <button
           type="button"
@@ -210,7 +226,10 @@ export function PairingMap({
             if (svgRef.current) {
               exportSvg(
                 svgRef.current,
-                safeFilename(name ?? `paarung-${candidate.site.position}`, "svg"),
+                safeFilename(
+                  name ?? `paarung-${candidate.site.position}`,
+                  "svg",
+                ),
               );
             }
           }}
@@ -298,7 +317,10 @@ export function PairingMap({
           {/* Basenpaare als senkrechte Striche */}
           {layout.arms.map((placed) => {
             if (placed.targetIndex === null) return null;
-            const art = bond(letterOf(placed.monomer), target[placed.targetIndex]);
+            const art = bond(
+              letterOf(placed.monomer),
+              target[placed.targetIndex],
+            );
             if (art === "none") {
               return (
                 <circle

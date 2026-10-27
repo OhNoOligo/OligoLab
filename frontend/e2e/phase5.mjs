@@ -48,16 +48,40 @@ try {
   await page.waitForTimeout(600);
   await page.locator("textarea").fill(TRANSKRIPT);
   await page.getByRole("button", { name: "übernehmen" }).click();
-  await page.waitForTimeout(2000);
+  // Auf den Zustand warten, nicht auf die Uhr: steht das Ziel noch nicht im
+  // Speicher, zeigt die Entwurfsseite ihre leere Karte.
+  await page.getByRole("banner").getByText("90 nt").waitFor({ timeout: 15000 });
 
   // ---- Entwurfsseite
   await page.goto(`${BASE}/entwurf`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(600);
+  await page
+    .getByRole("button", { name: "Kandidaten suchen" })
+    .waitFor({ timeout: 15000 });
 
+  /* Nicht auf den exakten Text prüfen: am Label hängt das Fragezeichen der
+   * Hilfe, und der Textinhalt lautet damit „5'-Arm?". Geprüft wird, dass das
+   * Feld da ist UND seine Hilfe hat — CLAUDE.md verlangt an jedem Feld ein
+   * `data-help`. */
   check(
     "die Einstellungen stehen oben",
-    await page.getByText("5'-Arm", { exact: true }).count(),
-    1,
+    await page.evaluate(() => {
+      const felder = ["field.arm5", "field.arm3", "field.arm_dg_target"];
+      return felder.every(
+        (id) =>
+          !!document.querySelector(`[data-help="${id}"]`) &&
+          !!document.getElementById(id.replace("field.", "").replace("arm_dg_target", "dg")),
+      );
+    }),
+    true,
+  );
+  check(
+    "und jedes Feld hat seine Hilfe",
+    await page.evaluate(
+      () =>
+        [...document.querySelectorAll("[data-help^='field.']")].length >= 8 &&
+        document.querySelectorAll("button[aria-label^='Hilfe']").length > 0,
+    ),
+    true,
   );
   check(
     "der Hinweis aus 5.4 ist noch nicht im Weg",
@@ -254,8 +278,36 @@ try {
   // Buchstaben auf der Kernschleife.
   check("der Rest bleibt DNA-grau", farben.dna, 27);
 
+  /* Regression: eine aufgebrachte Modifikation gehört zu GENAU einem
+   * Kandidaten. Wird über eine Marke im Profil ein anderer gewählt, zeigte
+   * die Paarungsdarstellung sonst den alten Strang unter der neuen
+   * Überschrift. */
+  const marken = await page.$$('svg[aria-label^="Zugänglichkeitsprofil"] g');
+  await marken[marken.length - 1].click();
+  await page.waitForTimeout(2500);
+  check(
+    "ein Wechsel über das Profil nimmt die Modifikation mit",
+    await page.evaluate(() => {
+      const abschnitt = [...document.querySelectorAll("section")].find((s) =>
+        s.querySelector("h2")?.textContent?.startsWith("Paarung an"),
+      );
+      // NICHT im ganzen Abschnitt suchen: „LNA" steht auch in der
+      // Auswahlliste der Muster und wäre dort immer zu finden.
+      const sequenzzeile = abschnitt?.querySelector("p.ol-mono");
+      return [
+        sequenzzeile?.textContent?.trim() ?? null,
+        abschnitt?.querySelector("header p")?.textContent?.trim() ?? null,
+      ];
+    }),
+    [null, null],
+  );
+  // Zurück zum besten Kandidaten.
+  await page.getByRole("button", { name: "Punktzahl" }).click();
+  await page.waitForTimeout(400);
+  await page.locator("tbody tr").first().click();
+  await page.waitForTimeout(2000);
+
   // Der Kern: ein Eingriff dort muss blockiert werden (CLAUDE.md, Regel 6).
-  await page.getByRole("button", { name: "zurücksetzen" }).click();
   await page.waitForTimeout(600);
   const blockiert = await page.evaluate(async () => {
     const antwort = await fetch("/api/modify", {
@@ -264,8 +316,6 @@ try {
       body: JSON.stringify({
         sequence: "TTGGGGTAAGGCTAGCTACAACGAGGTGCATGT",
         pattern: "replace_position",
-        core_start: 10,
-        core_end: 24,
         position: 13,
         code: "LNA",
       }),
@@ -273,7 +323,7 @@ try {
     return antwort.json();
   });
   check(
-    "ein Eingriff im Kern wird blockiert",
+    "ein Eingriff im Kern wird auch ohne mitgeschickten Kern blockiert",
     [blockiert.modification.blocked, blockiert.modification.sequence],
     [true, "TTGGGGTAAGGCTAGCTACAACGAGGTGCATGT"],
   );

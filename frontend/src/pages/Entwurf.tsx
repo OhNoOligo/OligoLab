@@ -11,7 +11,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type DesignBody } from "../api";
 import { PairingMap } from "../components/PairingMap";
-import { Card, Chip, Empty, Field, Notice, NumberInput, Rating } from "../components/ui";
+import {
+  Card,
+  Chip,
+  Empty,
+  Field,
+  Notice,
+  NumberInput,
+  Rating,
+} from "../components/ui";
 import { exportSvg, safeFilename } from "../lib/svgExport";
 import { useStore } from "../state/store";
 import type {
@@ -60,7 +68,7 @@ type SortKey =
   | "self_fold_mfe"
   | "accessibility";
 
-const QUALITY_ORDER: Record<string, number> = { gut: 0, "mäßig": 1, schlecht: 2 };
+const QUALITY_ORDER: Record<string, number> = { gut: 0, mäßig: 1, schlecht: 2 };
 
 function sortValue(candidate: CandidateView, key: SortKey): number {
   switch (key) {
@@ -93,8 +101,16 @@ const COLUMNS: { key: SortKey; label: string; help: string }[] = [
   { key: "quality", label: "Junktion", help: "result.candidate.junction" },
   { key: "arm_dg_sum", label: "ΣΔG", help: "result.candidate.arm_dg" },
   { key: "imbalance", label: "Δ Arme", help: "result.candidate.imbalance" },
-  { key: "self_fold_mfe", label: "Eigenfaltung", help: "result.candidate.self_fold" },
-  { key: "accessibility", label: "Zugang", help: "result.candidate.accessibility" },
+  {
+    key: "self_fold_mfe",
+    label: "Eigenfaltung",
+    help: "result.candidate.self_fold",
+  },
+  {
+    key: "accessibility",
+    label: "Zugang",
+    help: "result.candidate.accessibility",
+  },
   { key: "score", label: "Punktzahl", help: "result.candidate.score" },
 ];
 
@@ -136,13 +152,17 @@ function Profile({
   const points: string[] = [];
   for (let column = 0; column < columns; column += 1) {
     const from = Math.floor((column * values.length) / columns);
-    const to = Math.max(from + 1, Math.floor(((column + 1) * values.length) / columns));
+    const to = Math.max(
+      from + 1,
+      Math.floor(((column + 1) * values.length) / columns),
+    );
     let best: number | null = null;
     for (let index = from; index < to; index += 1) {
       const value = values[index];
       if (value !== null && (best === null || value > best)) best = value;
     }
-    if (best !== null) points.push(`${x(from).toFixed(1)},${y(best).toFixed(1)}`);
+    if (best !== null)
+      points.push(`${x(from).toFixed(1)},${y(best).toFixed(1)}`);
   }
 
   return (
@@ -156,7 +176,8 @@ function Profile({
           type="button"
           className="ol-button text-xs"
           onClick={() =>
-            svgRef.current && exportSvg(svgRef.current, safeFilename("profil", "svg"))
+            svgRef.current &&
+            exportSvg(svgRef.current, safeFilename("profil", "svg"))
           }
         >
           SVG
@@ -253,11 +274,22 @@ const SNAPSHOT_ROWS: {
   { key: "tm5", label: "Tm 5'-Arm", unit: "°C", digits: 1 },
   { key: "tm3", label: "Tm 3'-Arm", unit: "°C", digits: 1 },
   { key: "arm_dg_sum", label: "ΣΔG der Arme", unit: "kcal/mol", digits: 2 },
-  { key: "imbalance", label: "Unterschied der Arme", unit: "kcal/mol", digits: 2 },
+  {
+    key: "imbalance",
+    label: "Unterschied der Arme",
+    unit: "kcal/mol",
+    digits: 2,
+  },
   { key: "self_fold_mfe", label: "Eigenfaltung", unit: "kcal/mol", digits: 2 },
 ];
 
-function Comparison({ before, after }: { before: SnapshotView; after: SnapshotView }) {
+function Comparison({
+  before,
+  after,
+}: {
+  before: SnapshotView;
+  after: SnapshotView;
+}) {
   return (
     <div>
       <table className="w-full text-xs tabular-nums">
@@ -275,7 +307,10 @@ function Comparison({ before, after }: { before: SnapshotView; after: SnapshotVi
             const neu = after[row.key] as number | null;
             const diff = alt === null || neu === null ? null : neu - alt;
             return (
-              <tr key={row.key} style={{ borderTop: "1px solid var(--border)" }}>
+              <tr
+                key={row.key}
+                style={{ borderTop: "1px solid var(--border)" }}
+              >
                 <td className="py-1">{row.label}</td>
                 <td className="ol-mono py-1 text-right">
                   {alt === null ? "—" : alt.toFixed(row.digits)}
@@ -407,13 +442,22 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
   }, [design, sortKey, onlyGood]);
 
   const current = useMemo(
-    () =>
-      design?.candidates.find((c) => c.site.position === selected) ?? null,
+    () => design?.candidates.find((c) => c.site.position === selected) ?? null,
     [design, selected],
   );
 
+  /* Eine aufgebrachte Modifikation gehört zu GENAU dem Kandidaten, auf dem
+   * sie aufgebracht wurde. Beim Wechsel der Auswahl muss sie weg — sonst
+   * zeigte die Paarungsdarstellung den Strang des vorigen Kandidaten unter
+   * der Überschrift des neuen. Das hier fängt beide Wege ab: die Tabelle
+   * und die Marken im Profil. */
+  useEffect(() => {
+    setModified(null);
+  }, [selected]);
+
   // Die Farben der Paarungsdarstellung kommen aus den Monomer-Objekten.
-  const shownSequence = modified?.modification.sequence ?? current?.sequence ?? null;
+  const shownSequence =
+    modified?.modification.sequence ?? current?.sequence ?? null;
   useEffect(() => {
     if (!shownSequence) {
       setStrand(null);
@@ -487,7 +531,10 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = safeFilename(`kandidaten-${target?.name ?? "ziel"}`, "csv");
+      anchor.download = safeFilename(
+        `kandidaten-${target?.name ?? "ziel"}`,
+        "csv",
+      );
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (cause) {
@@ -518,7 +565,9 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
       <Card
         title="Einstellungen"
         subtitle={`Ziel: ${target.name || "ohne Namen"} · ${target.sequence.length} Basen${
-          target.region ? ` · Bereich ${target.region.start}–${target.region.end}` : ""
+          target.region
+            ? ` · Bereich ${target.region.start}–${target.region.end}`
+            : ""
         }`}
         helpId="field.design.settings"
         actions={
@@ -534,7 +583,12 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
         }
       >
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          <Field label="5'-Arm" role="settings" helpId="field.arm5" htmlFor="arm5">
+          <Field
+            label="5'-Arm"
+            role="settings"
+            helpId="field.arm5"
+            htmlFor="arm5"
+          >
             <NumberInput
               id="arm5"
               value={settings.arm5}
@@ -543,7 +597,12 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
               onChange={(value) => setSettings({ ...settings, arm5: value })}
             />
           </Field>
-          <Field label="3'-Arm" role="settings" helpId="field.arm3" htmlFor="arm3">
+          <Field
+            label="3'-Arm"
+            role="settings"
+            helpId="field.arm3"
+            htmlFor="arm3"
+          >
             <NumberInput
               id="arm3"
               value={settings.arm3}
@@ -562,7 +621,9 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
             <NumberInput
               id="dg"
               value={settings.armDgTarget}
-              onChange={(value) => setSettings({ ...settings, armDgTarget: value })}
+              onChange={(value) =>
+                setSettings({ ...settings, armDgTarget: value })
+              }
             />
           </Field>
           <Field
@@ -576,7 +637,9 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
               id="imb"
               value={settings.maxImbalance}
               min={0}
-              onChange={(value) => setSettings({ ...settings, maxImbalance: value })}
+              onChange={(value) =>
+                setSettings({ ...settings, maxImbalance: value })
+              }
             />
           </Field>
           <Field
@@ -589,7 +652,9 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
             <NumberInput
               id="sf"
               value={settings.selfFoldLimit}
-              onChange={(value) => setSettings({ ...settings, selfFoldLimit: value })}
+              onChange={(value) =>
+                setSettings({ ...settings, selfFoldLimit: value })
+              }
             />
           </Field>
           <Field
@@ -626,7 +691,10 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
               checked={settings.withStructure}
               data-help="field.with_structure"
               onChange={(event) =>
-                setSettings({ ...settings, withStructure: event.target.checked })
+                setSettings({
+                  ...settings,
+                  withStructure: event.target.checked,
+                })
               }
             />
             Faltung und Zugänglichkeit mitrechnen (dauert länger)
@@ -647,7 +715,11 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
           </Notice>
 
           <Card title="Zugänglichkeit und Kandidaten" helpId="result.profile">
-            <Profile design={design} selected={selected} onSelect={setSelected} />
+            <Profile
+              design={design}
+              selected={selected}
+              onSelect={setSelected}
+            />
           </Card>
 
           <Card
@@ -668,7 +740,11 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
                   />
                   nur grüne
                 </label>
-                <button type="button" className="ol-button text-xs" onClick={downloadCsv}>
+                <button
+                  type="button"
+                  className="ol-button text-xs"
+                  onClick={downloadCsv}
+                >
                   CSV
                 </button>
               </>
@@ -751,7 +827,8 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
                             </Rating>
                           </td>
                           <td className="py-1 text-right">
-                            {candidate.site.position}/{candidate.site.position + 1}
+                            {candidate.site.position}/
+                            {candidate.site.position + 1}
                           </td>
                           <td className="py-1 text-right">
                             {candidate.site.junction} · {candidate.site.quality}
@@ -817,7 +894,9 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <div>
-              <h3 className="mb-2 text-xs font-semibold">Die sechs Kriterien</h3>
+              <h3 className="mb-2 text-xs font-semibold">
+                Die sechs Kriterien
+              </h3>
               <table className="w-full text-xs tabular-nums">
                 <tbody>
                   {current.criteria.map((criterion) => (
@@ -827,7 +906,9 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
                     >
                       <td className="py-1">{criterion.label}</td>
                       <td className="ol-mono py-1 text-right">
-                        {criterion.raw === null ? "—" : criterion.raw.toFixed(2)}
+                        {criterion.raw === null
+                          ? "—"
+                          : criterion.raw.toFixed(2)}
                       </td>
                       <td className="ol-mono py-1 text-right">
                         {criterion.score === null
@@ -856,9 +937,16 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
             </div>
 
             <div>
-              <h3 className="mb-2 text-xs font-semibold">Modifikation aufbringen</h3>
+              <h3 className="mb-2 text-xs font-semibold">
+                Modifikation aufbringen
+              </h3>
               <div className="flex flex-wrap items-end gap-2">
-                <Field label="Muster" role="settings" helpId="field.pattern" htmlFor="pat">
+                <Field
+                  label="Muster"
+                  role="settings"
+                  helpId="field.pattern"
+                  htmlFor="pat"
+                >
                   <select
                     id="pat"
                     className="ol-input"
@@ -894,7 +982,10 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
 
               {modified?.modification.blocked && (
                 <div className="mt-3">
-                  <Notice level="bad" title="Das greift in den katalytischen Kern ein">
+                  <Notice
+                    level="bad"
+                    title="Das greift in den katalytischen Kern ein"
+                  >
                     {modified.modification.message}
                     <button
                       type="button"
@@ -931,7 +1022,7 @@ export function Entwurf({ navigate }: { navigate: (path: string) => void }) {
               ΣΔG {current.arm_dg_sum?.toFixed(2) ?? "—"} kcal/mol
             </Chip>
             <Chip role="result">
-              Tm {current.tm5?.tm?.value?.toFixed(1) ?? "—"} / {" "}
+              Tm {current.tm5?.tm?.value?.toFixed(1) ?? "—"} /{" "}
               {current.tm3?.tm?.value?.toFixed(1) ?? "—"} °C
             </Chip>
             <Chip role="result">{current.length} Bausteine</Chip>
