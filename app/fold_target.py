@@ -51,6 +51,10 @@ CHUNK = 1000
 #: Gaskonstante in kcal/(mol·K).
 R_KCAL = 0.0019872041
 
+#: Ab hier ist eine "Energie" keine Energie mehr, sondern ViennaRNAs
+#: Platzhalter fuer "kein Duplex moeglich" (100000 kcal/mol).
+NO_DUPLEX_SENTINEL = 1000.0
+
 
 def _rt(temperature_c: float) -> float:
     return R_KCAL * (temperature_c + 273.15)
@@ -430,8 +434,19 @@ def rnaup(
         p_oligo = min(1.0, math.exp(oligo_ensemble / _rt(temperature_c)))
 
         duplex = _RNA.duplexfold(target_sequence[site_start - 1 : site_end], oligo)
-        hybrid = float(duplex.energy)
         duplex_structure = duplex.structure
+        hybrid: float | None = float(duplex.energy)
+
+        # ViennaRNA meldet "kein Duplex moeglich" nicht als Fehler, sondern mit
+        # einem Platzhalter von 100000 kcal/mol und einer Struktur ohne
+        # Klammern. Ungeprueft durchgereicht waere das eine Zahl, die sich in
+        # jede Summe und jede Rangfolge hineinrechnet und dort wie ein
+        # Messwert aussieht.
+        if hybrid is not None and (
+            hybrid >= NO_DUPLEX_SENTINEL or "(" not in duplex_structure
+        ):
+            hybrid = None
+            duplex_structure = None
 
     e_ziel = opening_energy(p_ziel, temperature_c)
     e_oligo = opening_energy(p_oligo, temperature_c)
@@ -444,11 +459,18 @@ def rnaup(
 
     gesamt = (
         None
-        if e_ziel is None or e_oligo is None
+        if hybrid is None or e_ziel is None or e_oligo is None
         else hybrid + e_ziel + e_oligo
     )
+
     note = HYBRID_CAVEAT
-    if e_ziel is None:
+    if hybrid is None:
+        note = (
+            "Zwischen dieser Stelle und dem Oligo bildet sich kein Duplex — "
+            "sie sind nicht komplementär genug. Ohne Hybridisierung gibt es "
+            f"auch keine Summe. {HYBRID_CAVEAT}"
+        )
+    elif e_ziel is None:
         note = (
             "Die Stelle ist praktisch nie offen — die Öffnungsenergie wäre "
             f"unendlich. {HYBRID_CAVEAT}"

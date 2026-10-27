@@ -153,7 +153,20 @@ export function Ziel({ navigate }: { navigate: (path: string) => void }) {
   const length = sequence.length;
 
   const [regions, setRegions] = useState<RegionView[]>([]);
-  const [range, setRange] = useState<Range>({ start: 1, end: DEFAULT_WINDOW });
+  const [rawRange, setRawRange] = useState<Range>({ start: 1, end: DEFAULT_WINDOW });
+
+  /* Der Bereich wird immer geordnet und beschnitten weitergegeben. Ohne das
+   * rechnete das Backend den getauschten Bereich — es ordnet selbst — die
+   * Karte zeichnete aber eine negative Laenge, also gar nichts, und darunter
+   * stuende "Bereich 80-10 (-69 Basen)". */
+  const range: Range = useMemo(() => {
+    const grenze = Math.max(1, length);
+    const von = Math.min(Math.max(1, rawRange.start), grenze);
+    const bis = Math.min(Math.max(1, rawRange.end), grenze);
+    return { start: Math.min(von, bis), end: Math.max(von, bis) };
+  }, [rawRange, length]);
+
+  const setRange = setRawRange;
   const [folding, setFolding] = useState<TargetFoldView | null>(null);
   const [access, setAccess] = useState<AccessibilityView | null>(null);
   const [probeLength, setProbeLength] = useState<number | "">(15);
@@ -186,7 +199,7 @@ export function Ziel({ navigate }: { navigate: (path: string) => void }) {
   // Bereich zurechtrücken, wenn eine neue Sequenz kommt.
   useEffect(() => {
     if (!length) return;
-    setRange((alt) => ({
+    setRawRange((alt) => ({
       start: Math.min(alt.start, length),
       end: Math.min(Math.max(alt.end, Math.min(DEFAULT_WINDOW, length)), length),
     }));
@@ -549,10 +562,10 @@ export function Ziel({ navigate }: { navigate: (path: string) => void }) {
               </Field>
               <Field label="Bereich von" helpId="field.region" role="settings">
                 <NumberInput
-                  value={range.start}
+                  value={rawRange.start}
                   onChange={(wert) =>
                     typeof wert === "number" &&
-                    setRange((alt) => ({ ...alt, start: Math.max(1, wert) }))
+                    setRawRange((alt) => ({ ...alt, start: wert }))
                   }
                   step={1}
                   min={1}
@@ -560,10 +573,10 @@ export function Ziel({ navigate }: { navigate: (path: string) => void }) {
               </Field>
               <Field label="bis" helpId="field.region" role="settings">
                 <NumberInput
-                  value={range.end}
+                  value={rawRange.end}
                   onChange={(wert) =>
                     typeof wert === "number" &&
-                    setRange((alt) => ({ ...alt, end: Math.min(length, wert) }))
+                    setRawRange((alt) => ({ ...alt, end: wert }))
                   }
                   step={1}
                   min={1}

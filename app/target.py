@@ -178,16 +178,28 @@ def from_genbank(text: str, name: str | None = None) -> Target:
     regions: list[Region] = []
     cds: tuple[int, int] | None = None
 
+    def teile(feature) -> list[tuple[int, int]]:
+        """Die Abschnitte eines Merkmals, 1-basiert.
+
+        Ein `join(11..20,31..40)` sind ZWEI Stuecke mit einem Intron
+        dazwischen. Nur Anfang und Ende zu nehmen zeichnete einen
+        durchgehenden Balken quer ueber das Intron — eine stille
+        Falschaussage darueber, wo kodiert wird.
+        """
+        stuecke = getattr(feature.location, "parts", None) or [feature.location]
+        return [(int(t.start) + 1, int(t.end)) for t in stuecke]
+
     for feature in record.features:
-        start = int(feature.location.start) + 1
-        end = int(feature.location.end)
-        if feature.type == "CDS" and cds is None:
-            cds = (start, end)
-            regions.append(Region("cds", start, end))
+        if feature.type == "CDS":
+            abschnitte = teile(feature)
+            if cds is None:
+                # Fuer die UTR-Ableitung zaehlt die aeussere Spanne.
+                cds = (abschnitte[0][0], abschnitte[-1][1])
+                regions += [Region("cds", start, end) for start, end in abschnitte]
         elif feature.type == "5'UTR":
-            regions.append(Region("5utr", start, end))
+            regions += [Region("5utr", s, e) for s, e in teile(feature)]
         elif feature.type == "3'UTR":
-            regions.append(Region("3utr", start, end))
+            regions += [Region("3utr", s, e) for s, e in teile(feature)]
 
     # Fehlen die UTR-Merkmale, ergeben sie sich aus der Lage des CDS.
     if cds is not None:

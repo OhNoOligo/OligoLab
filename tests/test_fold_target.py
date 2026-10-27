@@ -283,3 +283,31 @@ def test_stelle_ausserhalb_des_ziels(start, ende):
 def test_rnaup_ohne_oligo():
     with pytest.raises(ValueError):
         ft.rnaup(OFFEN, 1, 5, "")
+
+
+def test_kein_duplex_ist_keine_zahl():
+    """ViennaRNA meldet "kein Duplex möglich" als 100000 kcal/mol.
+
+    Ungeprüft durchgereicht wäre das eine Zahl, die sich in jede Summe und
+    jede Rangfolge hineinrechnet und dort wie ein Messwert aussieht.
+    """
+    ziel = "A" * 30 + HAARNADEL + "A" * 30
+
+    # A gegen A paart nicht.
+    ohne = ft.rnaup(ziel, 1, 10, "A" * 10)
+    assert ohne.hybridisation.value is None
+    assert ohne.total.value is None
+    assert ohne.duplex_structure is None
+    assert "kein Duplex" in (ohne.note or "")
+
+    # Die Gegenprobe: U gegen A paart sehr wohl.
+    mit = ft.rnaup(ziel, 1, 10, "U" * 10)
+    assert mit.hybridisation.value is not None
+    assert mit.hybridisation.value < 0
+    assert mit.hybridisation.value > -ft.NO_DUPLEX_SENTINEL
+
+
+def test_oligo_laenger_als_die_stelle_erfindet_keine_energie():
+    ziel = "A" * 30 + HAARNADEL + "A" * 30
+    ergebnis = ft.rnaup(ziel, 1, 5, "A" * 50)
+    assert ergebnis.hybridisation.value is None

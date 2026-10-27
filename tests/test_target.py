@@ -297,3 +297,30 @@ def test_erfolgreicher_abruf_landet_im_zwischenspeicher(monkeypatch, data_dir):
     assert pfad.exists()
     with pfad.open(encoding="utf-8") as fh:
         assert json.load(fh)["identifier"] == "TESTSEQ"
+
+
+GENBANK_JOIN = GENBANK.replace(
+    "     CDS             11..40\n", "     CDS             join(11..20,31..40)\n"
+)
+
+
+def test_zusammengesetzter_cds_wird_in_stuecken_gezeichnet():
+    """`join(11..20,31..40)` sind ZWEI Stücke mit einem Intron dazwischen.
+
+    Nur Anfang und Ende zu nehmen zöge einen durchgehenden Balken quer über
+    das Intron — eine stille Falschaussage darüber, wo kodiert wird.
+    """
+    ziel = target.from_genbank(GENBANK_JOIN)
+    cds = [(r.start, r.end) for r in ziel.regions if r.kind == "cds"]
+    assert cds == [(11, 20), (31, 40)]
+
+    # Die UTR richten sich weiter nach der äußeren Spanne.
+    nach_art = {r.kind: (r.start, r.end) for r in ziel.regions if r.kind != "cds"}
+    assert nach_art["5utr"] == (1, 10)
+    assert nach_art["3utr"] == (41, 60)
+
+
+def test_einfacher_cds_bleibt_ein_stueck():
+    """Die Gegenprobe: ohne join() wird nicht zerstückelt."""
+    cds = [(r.start, r.end) for r in target.from_genbank(GENBANK).regions if r.kind == "cds"]
+    assert cds == [(11, 40)]

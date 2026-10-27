@@ -28,7 +28,7 @@ dann genügt Uvicorn allein.
 Tests:
 
 ```bash
-.venv/bin/python -m pytest          # 309 Fälle
+.venv/bin/python -m pytest          # 313 Fälle
 cd frontend && npm run typecheck
 cd frontend && npm run e2e          # Abnahmetests zu Phase 2, 3 und 4
 ```
