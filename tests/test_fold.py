@@ -187,3 +187,50 @@ def test_haarnadeln_in_einer_mehrfachschleife():
     struktur = "((((....))))....((((....))))"
     haarnadeln = fold.find_hairpins(sequenz, struktur)
     assert [(h.start, h.end) for h in haarnadeln] == [(1, 12), (17, 28)]
+
+
+def test_find_hairpins_haengt_nicht_am_zufaelligen_parametersatz():
+    """Die Funktion ist öffentlich und muss für sich allein stimmen.
+
+    Ohne eigene Absicherung käme dieselbe Haarnadel einmal mit -23 und einmal
+    mit -12 kcal/mol heraus, je nachdem was zuletzt geladen wurde.
+    """
+    import RNA
+
+    sequenz = "AAAAGGGGGCCCCTTTTGGGGCCCCCAAAA"
+    struktur = "....(((((((((....)))))))))...."
+
+    RNA.params_load_RNA_Turner2004()
+    ohne_kontext = fold.find_hairpins(sequenz, struktur)[0].energy
+    with fold.dna_parameters():
+        im_kontext = fold.find_hairpins(sequenz, struktur)[0].energy
+
+    assert ohne_kontext == pytest.approx(im_kontext, abs=1e-6)
+    assert ohne_kontext == pytest.approx(-12.3, abs=1.0)
+
+
+def test_dna_parameters_ist_wiedereintrittsfaehig():
+    """Ein verschachtelter Block darf dem äußeren nichts wegziehen."""
+    import RNA
+
+    hairpin = "GGGGGCCCCTTTTGGGGCCCCC"
+    with fold.dna_parameters():
+        with fold.dna_parameters():
+            pass
+        # Nach dem inneren Block muss DNA noch gelten.
+        assert RNA.fold_compound(hairpin).mfe()[1] == pytest.approx(-12.3, abs=1.0)
+    # Nach dem äußeren wieder RNA.
+    assert RNA.fold_compound(hairpin).mfe()[1] == pytest.approx(-23.0, abs=1.0)
+
+
+def test_trennzeichen_verschiebt_die_positionen_nicht():
+    """`&` steht zwischen zwei Strängen und belegt keine Position.
+
+    Würde es mitgezählt, säße jede Position des zweiten Strangs um eins
+    verschoben — und die Duplexstruktur zeigte auf die falschen Bausteine.
+    """
+    paare = fold.pairs_from_structure("((..))&((..))")
+    assert paare[1] == 6 and paare[2] == 5
+    # Zweiter Strang: Positionen 7 bis 12, nicht 8 bis 13.
+    assert paare[7] == 12 and paare[8] == 11
+    assert 13 not in paare

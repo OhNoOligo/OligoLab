@@ -43,6 +43,12 @@ except ImportError:  # pragma: no cover
 UNKNOWN_BASE = "N"
 
 
+# Wie tief wir gerade in `dna_parameters()` stecken. Ohne diesen Zaehler
+# wuerde ein verschachtelter Block beim Verlassen auf RNA zurueckstellen und
+# dem umgebenden Block den Parametersatz unter den Fuessen wegziehen.
+_dna_depth = 0
+
+
 @contextmanager
 def dna_parameters() -> Iterator[None]:
     """DNA-Parameter fuer die Dauer des Blocks, danach wieder RNA.
@@ -50,29 +56,46 @@ def dna_parameters() -> Iterator[None]:
     ViennaRNA bietet kein Auslesen des aktiven Satzes an, darum wird am Ende
     der Standardsatz (Turner 2004, RNA) gesetzt. Das ist der Zustand, in dem
     ViennaRNA startet — jede Phase, die RNA faltet, findet ihn also vor.
+
+    Wiedereintrittsfaehig: verschachtelte Bloecke sind erlaubt, und erst der
+    aeusserste stellt zurueck.
     """
+    global _dna_depth
     if not VIENNA_AVAILABLE:
         raise RuntimeError("ViennaRNA ist nicht installiert.")
-    _RNA.params_load_DNA_Mathews2004()
+    if _dna_depth == 0:
+        _RNA.params_load_DNA_Mathews2004()
+    _dna_depth += 1
     try:
         yield
     finally:
-        _RNA.params_load_RNA_Turner2004()
+        _dna_depth -= 1
+        if _dna_depth == 0:
+            _RNA.params_load_RNA_Turner2004()
 
 
 def pairs_from_structure(structure: str) -> dict[int, int]:
-    """Klammerstruktur in Paare {i: j} und {j: i}, 1-basiert."""
+    """Klammerstruktur in Paare {i: j} und {j: i}, 1-basiert.
+
+    Das Trennzeichen `&` einer Duplexstruktur belegt keine Position: es steht
+    zwischen zwei Straengen, nicht an einem Nukleotid. Wuerde es mitgezaehlt,
+    saessen alle Positionen des zweiten Strangs um eins verschoben.
+    """
     stack: list[int] = []
     pairs: dict[int, int] = {}
-    for index, char in enumerate(structure, start=1):
+    position = 0
+    for char in structure:
+        if char == "&":
+            continue
+        position += 1
         if char == "(":
-            stack.append(index)
+            stack.append(position)
         elif char == ")":
             if not stack:
                 continue
             opener = stack.pop()
-            pairs[opener] = index
-            pairs[index] = opener
+            pairs[opener] = position
+            pairs[position] = opener
     return pairs
 
 
@@ -132,7 +155,16 @@ def find_hairpins(sequence: str, structure: str) -> list[Hairpin]:
             piece_seq = sequence[outer_open - 1 : outer_close]
             piece_struct = structure[outer_open - 1 : outer_close]
             try:
-                energy = float(_RNA.eval_structure_simple(piece_seq, piece_struct))
+                # Die Funktion ist oeffentlich. Ohne diesen Block haengt ihr
+                # Ergebnis davon ab, welcher Parametersatz zufaellig geladen
+                # ist — dieselbe Haarnadel kaeme einmal mit -23 und einmal mit
+                # -12 kcal/mol heraus. Der Kontextmanager ist
+                # wiedereintrittsfaehig, der Aufruf aus `compute` heraus also
+                # unschaedlich.
+                with dna_parameters():
+                    energy = float(
+                        _RNA.eval_structure_simple(piece_seq, piece_struct)
+                    )
             except Exception:
                 # Lieber keine Zahl als eine falsche.
                 energy = None

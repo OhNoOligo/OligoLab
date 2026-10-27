@@ -282,3 +282,96 @@ def test_ohne_befunde_ist_worst_none(registry):
 )
 def test_schwellen_wie_in_phasen_md(schwelle, wert):
     assert getattr(critical, schwelle) == wert
+
+
+# ============================================== Haarnadel im Kern: kritisch
+
+
+def test_haarnadel_im_kern_ist_kritisch(registry):
+    """Die Zeile aus der Tabelle, die der übrige Test nicht abdeckte.
+
+    Der 10-23-Kern faltet für sich allein nicht. Erst mit seinem Komplement
+    daneben entsteht eine Haarnadel, die ihn überlappt — und dann muss der
+    Befund kritisch sein, nicht nur eine Warnung.
+    """
+    kern = "GGCTAGCTACAACGA"
+    komplement = "TCGTTGTAGCTAGCC"
+    _, teile, ergebnis = befunde("AAAA" + kern + komplement, registry)
+
+    assert teile.found
+    treffer = [f for f in ergebnis.findings if f.code == "hairpin_core"]
+    assert len(treffer) == 1
+    assert treffer[0].severity == "kritisch"
+    # Der Bereich muss den Kern wirklich berühren.
+    kernteil = teile.core_part
+    assert kernteil is not None
+    assert treffer[0].start <= kernteil.end and treffer[0].end >= kernteil.start
+    assert "Kern" in treffer[0].title
+
+
+# ====================================================== Reichweite der Befunde
+
+
+def test_befunde_tragen_ihre_reichweite(registry):
+    """Ob ein Befund dem ganzen Strang gilt, steht am Befund.
+
+    Die Sequenzkarte blendet `strand`-Befunde in der Warnspur aus, sonst
+    färbten sie jede Position ein. Würde das aus der Länge geraten, träfe es
+    auch eine Haarnadel über die volle Länge — etwas ganz anderes.
+    """
+    _, _, ergebnis = befunde(REFERENCE_SEQUENCE, registry)
+    nach_code = {f.code: f.scope for f in ergebnis.findings}
+    assert nach_code["homodimer"] == "strand"
+    assert nach_code["homopolymer"] == "region"
+
+    _, _, mit_lna = befunde(LNA_IM_KERN, registry)
+    assert next(
+        f.scope for f in mit_lna.findings if f.code == "core_modification"
+    ) == "position"
+
+
+def test_armungleichgewicht_gilt_dem_ganzen_strang(registry):
+    _, _, ergebnis = befunde(
+        "ACGTACG" + "GGCTAGCTACAACGA" + "ACGTACGTACGT", registry
+    )
+    treffer = next(f for f in ergebnis.findings if f.code == "arm_imbalance")
+    assert treffer.scope == "strand"
+
+
+def test_haarnadel_ueber_die_volle_laenge_bleibt_region(registry):
+    """Die Gegenprobe zur Reichweite: lang heißt nicht strangweit."""
+    _, _, ergebnis = befunde("GGGGGCCCCTTTTGGGGCCCCC", registry)
+    treffer = [f for f in ergebnis.findings if f.code == "hairpin"]
+    assert treffer, "die Haarnadel muss gefunden werden"
+    assert treffer[0].scope == "region"
+    assert (treffer[0].start, treffer[0].end) == (1, 22)
+
+
+def test_core_tested_entscheidet_allein(registry, tmp_path, monkeypatch):
+    """Auch ein unmodifizierter Baustein wird gemeldet, wenn er auf `nein` steht.
+
+    Vorher wurde unmodifizierte DNA nie geprüft. Ein Baustein, den jemand in
+    monomers.yaml ausdrücklich als im Kern untauglich markiert, wäre damit
+    stillschweigend durchgerutscht.
+    """
+    from app.registry import Registry, save_monomer
+
+    # dT im Kern ausdrücklich als untauglich markieren.
+    save_monomer({"code": "T", "core_tested": "nein"}, registry._data_dir)
+    eigene = Registry(registry._data_dir)
+
+    oligo = parse(REFERENCE_SEQUENCE, eigene)
+    teile = detect_parts(oligo, eigene)
+    ergebnis = critical.compute(oligo, teile, None, eigene)
+
+    treffer = [f for f in ergebnis.findings if f.code == "core_modification"]
+    # Im Kern GGCTAGCTACAACGA stehen zwei T.
+    assert len(treffer) == 2
+    assert all(f.severity == "kritisch" for f in treffer)
+    assert all("nachweislich nicht erprobt" in f.message for f in treffer)
+
+
+def test_standardbausteine_bleiben_unauffaellig(registry):
+    """Die Gegenprobe: ohne Eingriff meldet der Referenzkern nichts."""
+    _, _, ergebnis = befunde(REFERENCE_SEQUENCE, registry)
+    assert not [f for f in ergebnis.findings if f.code == "core_modification"]

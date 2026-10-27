@@ -334,6 +334,8 @@ export interface FindingView {
   title: string;
   message: string;
   detail: string | null;
+  /** "strand" heißt: gilt dem Strang als Ganzem, nicht einzelnen Stellen. */
+  scope: "position" | "region" | "strand";
 }
 
 export interface CriticalView {

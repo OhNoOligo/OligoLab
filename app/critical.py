@@ -63,6 +63,20 @@ HOMOPOLYMER_RUN = 4
 G_QUADRUPLEX = re.compile(r"(G{3,})(.{1,7})(G{3,})(.{1,7})(G{3,})(.{1,7})(G{3,})")
 
 
+#: Wie weit ein Befund reicht.
+#:
+#: `strand` heisst: der Befund gilt dem Strang als Ganzem und nicht einzelnen
+#: Stellen. Die Sequenzkarte laesst solche Befunde in der Warnspur aus — sonst
+#: faerbten sie jede Position ein und die Spur zeigte ueberall dasselbe. In der
+#: Befundliste stehen sie natuerlich trotzdem.
+#:
+#: Das muss am Befund stehen und darf nicht aus seiner Laenge geraten werden:
+#: ein Armungleichgewicht umspannt zufaellig auch den ganzen Strang, und eine
+#: Haarnadel ueber die volle Laenge tut es ebenfalls — gemeint ist aber etwas
+#: anderes.
+Scope = Literal["position", "region", "strand"]
+
+
 @dataclass(frozen=True)
 class Finding:
     """Ein Befund mit Positionsbereich, Schweregrad und einem Satz Erklaerung."""
@@ -74,6 +88,7 @@ class Finding:
     title: str
     message: str
     detail: str | None = None
+    scope: Scope = "region"
 
     @property
     def positions(self) -> range:
@@ -89,6 +104,7 @@ class Finding:
             "title": self.title,
             "message": self.message,
             "detail": self.detail,
+            "scope": self.scope,
         }
 
 
@@ -148,12 +164,15 @@ def _core_modifications(oligo: Oligo, parts: PartsResult) -> list[Finding]:
 
     findings: list[Finding] = []
     for monomer in oligo.monomers[core.start - 1 : core.end]:
-        if not monomer.modifications and monomer.spec.typ == "dna":
+        # Entschieden wird allein an `core_tested`. Vorher stand hier
+        # zusaetzlich, dass unmodifizierte DNA nie gemeldet wird — damit waere
+        # ein Baustein, den jemand in monomers.yaml ausdruecklich auf
+        # `core_tested: nein` setzt, stillschweigend durchgerutscht. Fuer die
+        # vier DNA-Standardbausteine aendert sich nichts: die stehen auf `ja`.
+        if monomer.core_tested == "ja":
             continue
 
         erprobt = monomer.core_tested
-        if erprobt == "ja":
-            continue
 
         was = (
             ", ".join(m.name for m in monomer.modifications)
@@ -169,6 +188,7 @@ def _core_modifications(oligo: Oligo, parts: PartsResult) -> list[Finding]:
             Finding(
                 code="core_modification",
                 severity="kritisch",
+                scope="position",
                 start=monomer.position,
                 end=monomer.position,
                 title=f"Modifikation im katalytischen Kern: {was}",
@@ -236,6 +256,7 @@ def _homodimer(folding: FoldResult, length: int) -> list[Finding]:
         Finding(
             code="homodimer",
             severity="warnung",
+            scope="strand",
             start=1,
             end=length,
             title=f"Selbstdimer {energy.value:.1f} kcal/mol",
@@ -310,6 +331,7 @@ def _arms(parts: PartsResult) -> list[Finding]:
                 Finding(
                     code="arm_imbalance",
                     severity="hinweis",
+                    scope="strand",
                     start=min(erster.start, zweiter.start),
                     end=max(erster.end, zweiter.end),
                     title=f"Armlängen unterschiedlich: {erster.length} und {zweiter.length}",

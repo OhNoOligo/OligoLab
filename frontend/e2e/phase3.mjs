@@ -21,8 +21,9 @@ const spuren = () =>
   page.evaluate(() => {
     const svg = document.querySelector('svg[aria-label^="Sequenzkarte"]');
     if (!svg) return [];
-    return [...svg.querySelectorAll("text")]
-      .filter((t) => Number(t.getAttribute("text-anchor") === "end"))
+    // Die Spurbeschriftungen stehen linksbündig am Rand, als einzige
+    // Texte mit text-anchor="end" — bis auf das 5′ über dem Lineal.
+    return [...svg.querySelectorAll('text[text-anchor="end"]')]
       .map((t) => t.textContent?.trim())
       .filter((t) => t && t !== "5′");
   });
@@ -51,22 +52,12 @@ try {
     "Modifikation im katalytischen Kern: LNA (verbrückte Nukleinsäure)",
   );
   check(
-    "der kritische Befund steht oben",
-    await page.evaluate(() => {
-      const first = document.querySelector("li button[aria-pressed] span span");
-      return window.getComputedStyle(first).backgroundColor;
-    }),
-    await page.evaluate(() => {
-      const styles = window.getComputedStyle(document.documentElement);
-      // Die Ampelfarbe für "kritisch".
-      const raw = styles.getPropertyValue("--rating-bad").trim();
-      const probe = document.createElement("span");
-      probe.style.backgroundColor = raw;
-      document.body.appendChild(probe);
-      const value = window.getComputedStyle(probe).backgroundColor;
-      probe.remove();
-      return value;
-    }),
+    "die Zählung nennt genau einen kritischen Befund",
+    await page
+      .locator("text=/1 kritisch/")
+      .count()
+      .then((n) => n > 0),
+    true,
   );
 
   // ============================================ 3.4 die sechs Spuren

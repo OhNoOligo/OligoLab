@@ -126,9 +126,14 @@ export function SequenceMap({
   const findingsByPosition = useMemo(() => {
     const out = new Map<number, FindingView[]>();
     for (const finding of critical?.findings ?? []) {
-      // Ein Befund über den ganzen Strang — etwa der Selbstdimer — würde
-      // jede Position einfärben und die Spur unbrauchbar machen.
-      if (finding.start === 1 && finding.end === length && length > 3) continue;
+      // Ein Befund über den ganzen Strang — Selbstdimer, Armungleichgewicht —
+      // würde jede Position einfärben und die Spur überall gleich aussehen
+      // lassen. Er steht in der Liste, nicht in der Spur.
+      //
+      // Das steht am Befund und wird nicht aus seiner Länge geraten: eine
+      // Haarnadel über die volle Länge ist etwas anderes als eine Aussage
+      // über den Bau des Strangs.
+      if (finding.scope === "strand") continue;
       for (let p = finding.start; p <= finding.end; p += 1) {
         const list = out.get(p) ?? [];
         list.push(finding);
