@@ -9,6 +9,12 @@ Oberfläche, Sequenzkarte, Ziel-RNA, DNAzym-Entwurf, Geometrie und 3D.
 
 ---
 
+**Neu hier?** [`ERSTE-SCHRITTE.md`](ERSTE-SCHRITTE.md) führt in einer Stunde
+durch alle fünf Bereiche, mit Sequenzen zum Einfügen und Zahlen zum
+Nachprüfen.
+
+---
+
 ## Inbetriebnahme
 
 **Der kurze Weg.** Linux und macOS:
