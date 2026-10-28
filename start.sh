@@ -50,7 +50,7 @@ fi
 
 # ------------------------------------------------------- Virtuelle Umgebung
 if [ ! -x .venv/bin/python ]; then
-  sagen "Richte die Python-Umgebung ein — das dauert beim ersten Mal einige Minuten."
+  sagen "Richte die Python-Umgebung ein."
   "$PY" -m venv .venv
 fi
 
@@ -58,8 +58,14 @@ fi
 STEMPEL=".venv/.requirements-stempel"
 if [ ! -f "$STEMPEL" ] || [ requirements.txt -nt "$STEMPEL" ]; then
   sagen "Installiere die Python-Pakete."
-  .venv/bin/pip install --quiet --upgrade pip
-  if ! .venv/bin/pip install --quiet -r requirements.txt; then
+  # Bewusst NICHT --quiet: hier werden einige hundert Megabyte geladen
+  # (RDKit, ViennaRNA, Biopython). Ohne Ausgabe sieht das minutenlang wie
+  # ein Absturz aus, und man bricht ab, obwohl alles läuft.
+  echo "Das sind rund 500 MB — je nach Leitung 2 bis 15 Minuten."
+  echo "Solange Zeilen erscheinen, läuft es. Nicht abbrechen."
+  echo
+  .venv/bin/pip install --upgrade pip
+  if ! .venv/bin/pip install -r requirements.txt; then
     fehlt "Die Pakete ließen sich nicht installieren."
     echo "  Ohne Netz geht das nicht. Mit Netz noch einmal versuchen:"
     echo "      .venv/bin/pip install -r requirements.txt"
@@ -71,21 +77,32 @@ fi
 # ------------------------------------------------------------- Oberfläche
 if [ ! -f frontend/dist/index.html ] || [ "$DEV" = "1" ]; then
   if ! command -v npm >/dev/null 2>&1; then
-    fehlt "Für die Oberfläche wird Node.js gebraucht (npm fehlt)."
-    echo "  Von https://nodejs.org herunterladen (LTS genügt) oder:"
-    echo "  Linux:  sudo apt install nodejs npm"
-    echo "  macOS:  brew install node"
-    echo
-    echo "  Ohne Oberfläche läuft nur die Schnittstelle unter /docs."
+    if [ "$DEV" = "1" ]; then
+      fehlt "Der Entwicklungsbetrieb braucht Node.js (npm fehlt)."
+      echo "  Ohne --dev läuft OligoLab mit der mitgelieferten Oberfläche."
+    else
+      fehlt "Die gebaute Oberfläche fehlt, und Node.js ist nicht da."
+      echo
+      echo "  Normalerweise liegt sie unter frontend/dist/ bei und muss nicht"
+      echo "  gebaut werden. Fehlt sie, hilft eines von beiden:"
+      echo
+      echo "  * OligoLab noch einmal herunterladen — dann ist sie dabei."
+      echo "  * Node.js installieren und das Skript erneut starten:"
+      echo "      https://nodejs.org   (die LTS-Fassung genügt)"
+      echo "      Linux:  sudo apt install nodejs npm"
+      echo "      macOS:  brew install node"
+      echo
+      echo "  Auch ohne Oberfläche läuft die Schnittstelle unter /docs."
+    fi
     exit 1
   fi
   if [ ! -d frontend/node_modules ]; then
-    sagen "Installiere die Pakete der Oberfläche."
-    (cd frontend && npm install --silent)
+    sagen "Installiere die Pakete der Oberfläche — noch einmal ein bis zwei Minuten."
+    (cd frontend && npm install)
   fi
   if [ "$DEV" = "0" ]; then
-    sagen "Baue die Oberfläche."
-    (cd frontend && npm run build >/dev/null)
+    sagen "Baue die Oberfläche — eine halbe Minute."
+    (cd frontend && npm run build)
   fi
 fi
 

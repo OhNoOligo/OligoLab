@@ -44,7 +44,7 @@ if not defined PY (
 rem --------------------------------------------------- Virtuelle Umgebung
 if not exist ".venv\Scripts\python.exe" (
   echo.
-  echo   Richte die Python-Umgebung ein - das dauert beim ersten Mal einige Minuten.
+  echo   Richte die Python-Umgebung ein.
   %PY% -m venv .venv
   if errorlevel 1 (
     echo   Die Umgebung liess sich nicht anlegen.
@@ -56,8 +56,14 @@ if not exist ".venv\Scripts\python.exe" (
 if not exist ".venv\.requirements-stempel" (
   echo.
   echo   Installiere die Python-Pakete.
-  ".venv\Scripts\python.exe" -m pip install --quiet --upgrade pip
-  ".venv\Scripts\python.exe" -m pip install --quiet -r requirements.txt
+  rem Bewusst NICHT --quiet: hier werden einige hundert Megabyte geladen
+  rem (RDKit, ViennaRNA, Biopython). Ohne Ausgabe sieht das minutenlang wie
+  rem ein Absturz aus, und man bricht ab, obwohl alles laeuft.
+  echo   Das sind rund 500 MB - je nach Leitung 2 bis 15 Minuten.
+  echo   Solange Zeilen erscheinen, laeuft es. Nicht abbrechen.
+  echo.
+  ".venv\Scripts\python.exe" -m pip install --upgrade pip
+  ".venv\Scripts\python.exe" -m pip install -r requirements.txt
   if errorlevel 1 (
     echo.
     echo   Die Pakete liessen sich nicht installieren. Ohne Netz geht das nicht.
@@ -72,20 +78,27 @@ if not exist "frontend\dist\index.html" (
   where npm >nul 2>&1
   if errorlevel 1 (
     echo.
-    echo   Fuer die Oberflaeche wird Node.js gebraucht ^(npm fehlt^).
-    echo   Herunterladen von https://nodejs.org - die LTS-Fassung genuegt.
+    echo   Die gebaute Oberflaeche fehlt, und Node.js ist nicht da.
     echo.
-    echo   Ohne Oberflaeche laeuft nur die Schnittstelle unter /docs.
+    echo   Normalerweise liegt sie unter frontend\dist\ bei und muss nicht
+    echo   gebaut werden. Fehlt sie, hilft eines von beiden:
+    echo.
+    echo     * OligoLab noch einmal herunterladen - dann ist sie dabei.
+    echo     * Node.js installieren und start.bat erneut starten:
+    echo         https://nodejs.org   ^(die LTS-Fassung genuegt^)
+    echo.
+    echo   Auch ohne Oberflaeche laeuft die Schnittstelle unter /docs.
+    echo.
     pause
     exit /b 1
   )
   if not exist "frontend\node_modules" (
-    echo   Installiere die Pakete der Oberflaeche.
+    echo   Installiere die Pakete der Oberflaeche - noch einmal ein bis zwei Minuten.
     pushd frontend
-    call npm install --silent
+    call npm install
     popd
   )
-  echo   Baue die Oberflaeche.
+  echo   Baue die Oberflaeche - eine halbe Minute.
   pushd frontend
   call npm run build
   popd

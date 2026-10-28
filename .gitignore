@@ -23,8 +23,19 @@ data/structures/*
 
 # Frontend
 node_modules/
-frontend/dist/
 frontend/node_modules/
+
+# `frontend/dist/` ist mit ABSICHT nicht ignoriert.
+#
+# OligoLab geht an Leute, die damit rechnen wollen und nicht entwickeln.
+# Wäre die gebaute Oberfläche nicht dabei, bräuchte jeder von ihnen Node.js,
+# nur um sie einmal zu bauen — ein Installationsschritt für etwas, das sich
+# nie ändert, solange niemand am Quelltext arbeitet.
+#
+# Preis dafür: wer `frontend/src/` ändert, muss `npm run build` laufen lassen
+# und das Ergebnis mit festschreiben, sonst zeigt das Programm den alten
+# Stand. Eine veraltete Oberfläche fällt schnell auf; eine fehlende hält
+# jeden auf, der das Programm nur benutzen will.
 
 # Editor / OS
 .DS_Store

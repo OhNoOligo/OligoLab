@@ -20,9 +20,15 @@ Oberfläche, Sequenzkarte, Ziel-RNA, DNAzym-Entwurf, Geometrie und 3D.
 Windows: `start.bat` doppelklicken.
 
 Das Skript prüft, was fehlt, legt die Python-Umgebung an, installiert die
-Pakete, baut die Oberfläche, startet den Dienst und öffnet den Browser. Beim
-ersten Mal dauert das einige Minuten, danach Sekunden. Fehlt Python oder
-Node.js, sagt es, was zu holen ist, statt mit einer Fehlermeldung abzubrechen.
+Pakete, startet den Dienst und öffnet den Browser.
+
+**Gebraucht wird nur Python 3.12 oder neuer.** Die Oberfläche liegt fertig
+gebaut unter `frontend/dist/` bei — Node.js braucht nur, wer am Quelltext
+der Oberfläche arbeitet.
+
+Der erste Start lädt rund 500 MB an Python-Paketen (RDKit, ViennaRNA,
+Biopython). Das dauert je nach Leitung zwei bis fünfzehn Minuten, und solange
+Zeilen erscheinen, läuft es. Danach startet OligoLab in Sekunden.
 
 `./start.sh --dev` startet zusätzlich Vite mit Neuladen, `--port 8080` wählt
 einen anderen Port, `--no-browser` lässt den Browser zu.
@@ -39,9 +45,11 @@ python3 -m venv .venv
 cd frontend && npm install && npm run dev      # http://localhost:5173
 ```
 
-`npm run build` legt die gebaute Oberfläche in `frontend/dist`. Liegt sie
-dort, liefert das Backend sie unter `http://127.0.0.1:8000` gleich mit aus —
-dann genügt Uvicorn allein.
+`npm run build` legt die gebaute Oberfläche in `frontend/dist`. Die liegt im
+Repository **mit dabei**, damit niemand Node.js installieren muss, nur um
+etwas zu bauen, das sich nie ändert. Wer `frontend/src/` ändert, muss neu
+bauen und das Ergebnis mit festschreiben — sonst zeigt das Programm den
+alten Stand.
 
 Tests:
 
