@@ -24,22 +24,58 @@ goto argumente
 :argumente_fertig
 
 rem ------------------------------------------------------------- Python
+rem
+rem Nicht einfach "neu genug": auch zu NEU ist ein Problem. Fuer eine frisch
+rem erschienene Python-Fassung gibt es noch keine fertigen Pakete von
+rem ViennaRNA und PyYAML, und pip versucht dann, sie aus dem Quelltext zu
+rem uebersetzen - was ohne Visual-C++-Compiler scheitert. Darum eine
+rem gepruefte Spanne, und die neueste passende wird zuerst genommen.
 set PY=
+call :pruefe py -3.14
+call :pruefe py -3.13
+call :pruefe py -3.12
+call :pruefe py
+call :pruefe python
+if defined PY goto python_da
+
+echo.
+echo   Keine brauchbare Python-Fassung gefunden.
+echo.
+rem Kein ">" in diesen Zeilen: cmd.exe liest es auch in Anfuehrungszeichen
+rem innerhalb eines Klammerblocks als Umleitung. struct.calcsize tut dasselbe.
 for %%K in (py python) do (
-  if not defined PY (
-    %%K -c "import sys; sys.exit(0 if sys.version_info[:2] >= (3,12) else 1)" >nul 2>&1
-    if !errorlevel! equ 0 set PY=%%K
-  )
+  %%K -c "import sys, struct; print('   Gefunden: Python', sys.version.split()[0], str(struct.calcsize('P') * 8) + '-Bit')" 2>nul
 )
-if not defined PY (
-  echo.
-  echo   Python 3.12 oder neuer wird gebraucht und ist nicht da.
-  echo   Herunterladen von https://www.python.org/downloads/
-  echo   Beim Installieren "Add Python to PATH" ankreuzen.
-  echo.
-  pause
-  exit /b 1
-)
+echo.
+echo   Gebraucht wird Python 3.12, 3.13 oder 3.14 in 64 Bit.
+echo.
+echo   Neuer geht NICHT: fuer Python 3.15 gibt es ViennaRNA und PyYAML noch
+echo   nicht fertig gebaut. pip versucht dann zu uebersetzen und scheitert
+echo   mit "failed-wheel-build-for-install". 32 Bit geht auch nicht -
+echo   ViennaRNA gibt es nur in 64 Bit.
+echo.
+echo   Herunterladen: https://www.python.org/downloads/release/python-3137/
+echo   Die Datei heisst "Windows installer (64-bit)".
+echo   Beim Installieren "Add Python to PATH" ankreuzen.
+echo.
+echo   Eine zu neue Fassung darf ruhig installiert bleiben - dieses Skript
+echo   sucht sich die passende heraus.
+echo.
+pause
+exit /b 1
+
+:pruefe
+rem Nimmt den ersten Kandidaten, der in der Spanne liegt UND 64 Bit ist.
+if defined PY exit /b
+%* -c "import sys, struct; sys.exit(0 if (3,12) <= sys.version_info[:2] <= (3,14) and struct.calcsize('P') == 8 else 1)" >nul 2>&1
+if errorlevel 1 exit /b
+set PY=%*
+exit /b
+
+:python_da
+for /f "delims=" %%V in ('%PY% -c "import sys; print(sys.version.split()[0])"') do set PYVER=%%V
+echo.
+echo   Python %PYVER% wird benutzt.
 
 rem --------------------------------------------------- Virtuelle Umgebung
 if not exist ".venv\Scripts\python.exe" (

@@ -34,17 +34,44 @@ sagen() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 fehlt() { printf '\n\033[31m%s\033[0m\n' "$1" >&2; }
 
 # ---------------------------------------------------------------- Python
+#
+# Nicht einfach "neu genug": auch zu NEU ist ein Problem. Fuer eine frisch
+# erschienene Python-Fassung gibt es noch keine fertigen Pakete von
+# ViennaRNA und PyYAML, und pip versucht dann, sie aus dem Quelltext zu
+# uebersetzen — was ohne Compiler scheitert. Darum eine geprüfte Spanne.
+MIN_PYTHON=312
+MAX_PYTHON=314   # letzte Fassung, fuer die es alle Pakete fertig gibt
+
+taugt() {
+  "$1" -c "
+import sys
+drin = $MIN_PYTHON <= sys.version_info[0]*100 + sys.version_info[1] <= $MAX_PYTHON
+sys.exit(0 if drin and sys.maxsize > 2**32 else 1)
+" >/dev/null 2>&1
+}
+
 PY=""
-for kandidat in python3.13 python3.12 python3; do
-  if command -v "$kandidat" >/dev/null 2>&1; then
-    version=$("$kandidat" -c 'import sys; print(sys.version_info[0]*100+sys.version_info[1])')
-    if [ "$version" -ge 312 ]; then PY="$kandidat"; break; fi
-  fi
+for kandidat in python3.14 python3.13 python3.12 python3 python; do
+  command -v "$kandidat" >/dev/null 2>&1 || continue
+  if taugt "$kandidat"; then PY="$kandidat"; break; fi
 done
+
 if [ -z "$PY" ]; then
-  fehlt "Python 3.12 oder neuer wird gebraucht und ist nicht da."
-  echo "  Linux:  sudo apt install python3 python3-venv   (oder die Paketverwaltung der Distribution)"
-  echo "  macOS:  brew install python@3.12"
+  fehlt "Keine brauchbare Python-Fassung gefunden."
+  # Sagen, was da ist und warum es nicht geht — eine blosse Absage hilft nicht.
+  for kandidat in python3 python; do
+    if command -v "$kandidat" >/dev/null 2>&1; then
+      echo "  Gefunden: $("$kandidat" -c 'import sys; print(sys.version.split()[0], "64-Bit" if sys.maxsize > 2**32 else "32-BIT")' 2>/dev/null)"
+    fi
+  done
+  echo
+  echo "  Gebraucht wird Python 3.12, 3.13 oder 3.14 in 64 Bit."
+  echo "  Neuer geht NICHT: für Python 3.15 gibt es ViennaRNA und PyYAML"
+  echo "  noch nicht fertig gebaut, und ohne Compiler scheitert die"
+  echo "  Installation. 32 Bit geht auch nicht — ViennaRNA gibt es nur in 64."
+  echo
+  echo "  Linux:  sudo apt install python3.13 python3.13-venv"
+  echo "  macOS:  brew install python@3.13"
   exit 1
 fi
 

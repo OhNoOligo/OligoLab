@@ -1,4 +1,14 @@
 # OligoLab — Backend. Alles laeuft lokal, keine kostenpflichtige API.
+#
+# Geprueft mit Python 3.12, 3.13 und 3.14 in 64 Bit.
+#
+# NICHT mit 3.15: fuer eine frisch erschienene Python-Fassung gibt es
+# ViennaRNA und PyYAML noch nicht fertig gebaut. pip versucht dann, sie aus
+# dem Quelltext zu uebersetzen, und das scheitert ohne Compiler mit
+# "failed-wheel-build-for-install". Sobald beide nachziehen, kann die Grenze
+# in start.sh und start.bat (MAX_PYTHON) hochgesetzt werden.
+#
+# NICHT in 32 Bit: ViennaRNA gibt es fuer Windows nur als win_amd64.
 fastapi>=0.115
 uvicorn[standard]>=0.30
 sqlmodel>=0.0.22

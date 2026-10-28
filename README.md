@@ -22,9 +22,15 @@ Windows: `start.bat` doppelklicken.
 Das Skript prüft, was fehlt, legt die Python-Umgebung an, installiert die
 Pakete, startet den Dienst und öffnet den Browser.
 
-**Gebraucht wird nur Python 3.12 oder neuer.** Die Oberfläche liegt fertig
-gebaut unter `frontend/dist/` bei — Node.js braucht nur, wer am Quelltext
-der Oberfläche arbeitet.
+**Gebraucht wird nur Python — 3.12, 3.13 oder 3.14, in 64 Bit.** Die
+Oberfläche liegt fertig gebaut unter `frontend/dist/` bei; Node.js braucht
+nur, wer am Quelltext der Oberfläche arbeitet.
+
+Python **3.15 geht noch nicht**: dafür gibt es ViennaRNA und PyYAML noch
+nicht fertig gebaut, und ohne C-Compiler bricht die Installation mit
+`failed-wheel-build-for-install` ab. Die Startskripte suchen sich die
+passende Fassung heraus, wenn mehrere installiert sind — eine zu neue darf
+also ruhig liegen bleiben.
 
 Der erste Start lädt rund 500 MB an Python-Paketen (RDKit, ViennaRNA,
 Biopython). Das dauert je nach Leitung zwei bis fünfzehn Minuten, und solange
